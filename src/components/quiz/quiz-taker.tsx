@@ -11,9 +11,10 @@ import { Label } from '@/components/ui/label';
 import { AlertCircle, CheckCircle, Loader2, ShieldOff, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { WithId, useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { WithId, useUser, useFirestore, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import { detectAndFlagCheatingAction } from '@/lib/actions';
 
 enum QuizState {
   Starting,
@@ -38,8 +39,6 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
 
   const handleViolation = useCallback(
     (reason: string) => {
-      // This check is important. If we are already submitting due to a violation,
-      // we don't want to trigger the submission logic again.
       if (quizState === QuizState.InProgress) {
         toast({
           variant: 'destructive',
@@ -47,7 +46,6 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
           description: reason,
         });
         setQuizState(QuizState.Violation);
-        // The submission logic is now handled in the useEffect hook watching quizState
       }
     },
     [quizState, toast]
@@ -71,6 +69,23 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
+
+  const runAiCheatDetection = useCallback(async (attempt: QuizAttempt) => {
+    if (!user) return;
+    const result = await detectAndFlagCheatingAction({
+       quizAttemptDetails: `Score: ${attempt.score}%, Violations: ${attempt.violations}`,
+       userDetails: `User ID: ${user.uid}, Name: ${user.displayName}`,
+       quizDetails: `Quiz: ${quiz.title}, Topic: ${quiz.topic}, Difficulty: ${quiz.difficulty}`,
+    });
+
+    if (result.success && result.data?.isCheating && firestore) {
+        const attemptRef = doc(firestore, 'quiz_attempts', attempt.id);
+        updateDocumentNonBlocking(attemptRef, { isFlagged: true });
+        
+        const userAttemptRef = doc(firestore, `users/${user.uid}/quiz_attempts`, attempt.id);
+        updateDocumentNonBlocking(userAttemptRef, { isFlagged: true });
+    }
+  }, [user, quiz, firestore]);
 
   const calculateAndSaveAttempt = useCallback(async (isViolation = false) => {
     if (!user || !firestore || !startTime) {
@@ -106,14 +121,14 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     };
 
     try {
-      // Save attempt to the root `quiz_attempts` collection.
-      // This makes querying for results by author much easier.
       const attemptsRef = doc(firestore, "quiz_attempts", attemptId);
       await setDocumentNonBlocking(attemptsRef, attempt, {});
 
-      // Optionally, still save a reference to the user's own attempts if needed for their history
       const userAttemptRef = doc(firestore, `users/${user.uid}/quiz_attempts`, attemptId);
       await setDocumentNonBlocking(userAttemptRef, attempt, {});
+      
+      // Run AI cheat detection in the background
+      runAiCheatDetection(attempt);
 
       setTimeout(() => {
         setQuizState(isViolation ? QuizState.Violation : QuizState.Finished);
@@ -127,7 +142,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
       });
       setQuizState(QuizState.InProgress); // Revert state
     }
-  }, [user, firestore, startTime, quiz, answers, violationCount]);
+  }, [user, firestore, startTime, quiz, answers, violationCount, runAiCheatDetection]);
 
   const handleSubmit = () => {
      setQuizState(QuizState.Submitting);
@@ -136,7 +151,6 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
 
   useEffect(() => {
     if (quizState === QuizState.Violation) {
-      // A violation has occurred, we must now submit the results.
       setQuizState(QuizState.Submitting);
       calculateAndSaveAttempt(true);
     }
@@ -150,7 +164,6 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
 
   useEffect(() => {
     if (quizState === QuizState.Violation || quizState === QuizState.Finished) {
-      // After submission and result display, wait before redirecting
       const timer = setTimeout(() => router.push('/dashboard'), 5000);
       return () => clearTimeout(timer);
     }
