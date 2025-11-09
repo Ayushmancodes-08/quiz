@@ -11,7 +11,9 @@ import {
   signInWithPopup, 
   signOut,
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword
+  signInWithEmailAndPassword,
+  updateProfile,
+  type UserCredential
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 
@@ -25,9 +27,9 @@ export type AppUser = {
 type AuthContextType = {
   user: AppUser | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, pass: string) => Promise<void>;
-  signUpWithEmail: (email: string, pass: string) => Promise<void>;
+  signInWithGoogle: () => Promise<UserCredential | undefined>;
+  signInWithEmail: (email: string, pass: string) => Promise<UserCredential | undefined>;
+  signUpWithEmail: (email: string, pass: string, displayName: string) => Promise<UserCredential | undefined>;
   logout: () => Promise<void>;
 };
 
@@ -50,19 +52,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     if (!auth) return;
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    const userCredential = await signInWithPopup(auth, provider);
     router.push('/dashboard');
+    return userCredential;
   }, [auth, router]);
 
-  const signUpWithEmail = useCallback(async (email: string, password: string): Promise<void> => {
+  const signUpWithEmail = useCallback(async (email: string, password: string, displayName: string): Promise<UserCredential | undefined> => {
     if (!auth) throw new Error("Auth service not available.");
-    await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName });
+    return userCredential;
   }, [auth]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     if (!auth) throw new Error("Auth service not available.");
-    await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
     router.push('/dashboard');
+    return userCredential;
   }, [auth, router]);
 
   const logout = useCallback(async () => {
