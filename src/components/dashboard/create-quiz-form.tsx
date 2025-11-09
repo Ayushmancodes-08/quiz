@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -16,6 +17,7 @@ import { generateQuizAction } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import type { Question } from '@/lib/types';
 import { Loader2, Save, Wand2 } from 'lucide-react';
+import { Textarea } from '../ui/textarea';
 
 const formSchema = z.object({
   topic: z.string().min(3, 'Topic must be at least 3 characters long.'),
@@ -46,7 +48,7 @@ export function CreateQuizForm() {
       setGeneratedQuiz(result.data.quiz);
       toast({
         title: 'Quiz Generated!',
-        description: 'Review the questions below before saving.',
+        description: 'Review and edit the questions below before saving.',
       });
     } else {
       toast({
@@ -65,6 +67,30 @@ export function CreateQuizForm() {
     });
     setGeneratedQuiz(null);
     form.reset();
+  }
+
+  function handleQuestionChange(questionIndex: number, newText: string) {
+    if (generatedQuiz) {
+      const updatedQuiz = [...generatedQuiz];
+      updatedQuiz[questionIndex].question = newText;
+      setGeneratedQuiz(updatedQuiz);
+    }
+  }
+
+  function handleOptionChange(questionIndex: number, optionIndex: number, newText: string) {
+    if (generatedQuiz) {
+      const updatedQuiz = [...generatedQuiz];
+      updatedQuiz[questionIndex].options[optionIndex] = newText;
+      setGeneratedQuiz(updatedQuiz);
+    }
+  }
+  
+  function handleCorrectAnswerChange(questionIndex: number, newCorrectAnswer: string) {
+    if (generatedQuiz) {
+      const updatedQuiz = [...generatedQuiz];
+      updatedQuiz[questionIndex].correctAnswer = newCorrectAnswer;
+      setGeneratedQuiz(updatedQuiz);
+    }
   }
 
   return (
@@ -143,18 +169,41 @@ export function CreateQuizForm() {
         <div className="border-t p-6">
           <h3 className="mb-4 text-xl font-bold font-headline">Review Generated Quiz</h3>
           <Accordion type="single" collapsible className="w-full">
-            {generatedQuiz.map((q, index) => (
-              <AccordionItem key={index} value={`item-${index}`}>
-                <AccordionTrigger className="font-headline">Question {index + 1}: {q.question}</AccordionTrigger>
+            {generatedQuiz.map((q, qIndex) => (
+              <AccordionItem key={qIndex} value={`item-${qIndex}`}>
+                <AccordionTrigger className="font-headline text-left">Question {qIndex + 1}: {q.question}</AccordionTrigger>
                 <AccordionContent>
-                  <RadioGroup defaultValue={q.correctAnswer} className="space-y-2 p-2">
-                    {q.options.map((option, i) => (
-                      <div key={i} className="flex items-center space-x-2">
-                        <RadioGroupItem value={option} id={`q${index}-option${i}`} />
-                        <Label htmlFor={`q${index}-option${i}`}>{option}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
+                  <div className="space-y-4 p-2">
+                    <div className="space-y-2">
+                      <Label htmlFor={`question-${qIndex}`}>Question Text</Label>
+                      <Textarea 
+                        id={`question-${qIndex}`}
+                        value={q.question}
+                        onChange={(e) => handleQuestionChange(qIndex, e.target.value)}
+                        className="text-base"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Options & Correct Answer</Label>
+                      <RadioGroup 
+                        value={q.correctAnswer} 
+                        onValueChange={(value) => handleCorrectAnswerChange(qIndex, value)}
+                        className="space-y-2"
+                      >
+                        {q.options.map((option, oIndex) => (
+                          <div key={oIndex} className="flex items-center space-x-2">
+                            <RadioGroupItem value={option} id={`q${qIndex}-option${oIndex}`} />
+                            <Input 
+                              id={`q${qIndex}-option-text-${oIndex}`}
+                              value={option}
+                              onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)}
+                              className="text-base"
+                             />
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -170,3 +219,4 @@ export function CreateQuizForm() {
     </Card>
   );
 }
+
