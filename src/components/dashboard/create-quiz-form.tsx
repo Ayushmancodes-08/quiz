@@ -15,37 +15,49 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { generateQuizAction } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
-import type { Question } from '@/lib/types';
+import type { Question, Quiz } from '@/lib/types';
 import { Loader2, Save, Wand2 } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
+import { useFirestore, useUser, addDocumentNonBlocking } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 const formSchema = z.object({
   topic: z.string().min(3, 'Topic must be at least 3 characters long.'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   numQuestions: z.coerce.number().int().min(1).max(10),
+  title: z.string().min(3, 'Title must be at least 3 characters long.')
 });
 
 export function CreateQuizForm() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [generatedQuiz, setGeneratedQuiz] = useState<Question[] | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [generatedQuiz, setGeneratedQuiz] = useState<Omit<Quiz, 'authorId' | 'createdAt'> | null>(null);
   const { toast } = useToast();
+  const firestore = useFirestore();
+  const { user } = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       topic: '',
+      title: '',
       difficulty: 'medium',
       numQuestions: 5,
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
+    setIsGenerating(true);
     setGeneratedQuiz(null);
     const result = await generateQuizAction(values);
-    setIsLoading(false);
+    setIsGenerating(false);
     if (result.success && result.data) {
-      setGeneratedQuiz(result.data.quiz);
+      setGeneratedQuiz({
+        title: values.title,
+        topic: values.topic,
+        difficulty: values.difficulty,
+        questions: result.data.quiz,
+      });
       toast({
         title: 'Quiz Generated!',
         description: 'Review and edit the questions below before saving.',
@@ -59,37 +71,66 @@ export function CreateQuizForm() {
     }
   }
 
-  function handleSaveQuiz() {
-    // In a real app, this would save the quiz to the database.
-    toast({
-      title: 'Quiz Saved!',
-      description: 'The quiz is now available in "My Quizzes".',
-    });
-    setGeneratedQuiz(null);
-    form.reset();
+  async function handleSaveQuiz() {
+    if (!generatedQuiz || !user || !firestore) {
+      toast({
+        variant: 'destructive',
+        title: 'Save Failed',
+        description: 'Cannot save quiz. Not authenticated or quiz not generated.',
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    const quizToSave: Quiz = {
+      ...generatedQuiz,
+      authorId: user.uid,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      const quizzesRef = collection(firestore, `users/${user.uid}/quizzes`);
+      await addDocumentNonBlocking(quizzesRef, quizToSave);
+      
+      toast({
+        title: 'Quiz Saved!',
+        description: 'The quiz is now available in "My Quizzes".',
+      });
+      setGeneratedQuiz(null);
+      form.reset();
+    } catch (error: any) {
+       toast({
+        variant: 'destructive',
+        title: 'Save Error',
+        description: error.message || 'Could not save the quiz to the database.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function handleQuestionChange(questionIndex: number, newText: string) {
     if (generatedQuiz) {
-      const updatedQuiz = [...generatedQuiz];
-      updatedQuiz[questionIndex].question = newText;
-      setGeneratedQuiz(updatedQuiz);
+      const updatedQuestions = [...generatedQuiz.questions];
+      updatedQuestions[questionIndex].question = newText;
+      setGeneratedQuiz({ ...generatedQuiz, questions: updatedQuestions });
     }
   }
 
   function handleOptionChange(questionIndex: number, optionIndex: number, newText: string) {
     if (generatedQuiz) {
-      const updatedQuiz = [...generatedQuiz];
-      updatedQuiz[questionIndex].options[optionIndex] = newText;
-      setGeneratedQuiz(updatedQuiz);
+      const updatedQuestions = [...generatedQuiz.questions];
+      updatedQuestions[questionIndex].options[optionIndex] = newText;
+      setGeneratedQuiz({ ...generatedQuiz, questions: updatedQuestions });
     }
   }
   
   function handleCorrectAnswerChange(questionIndex: number, newCorrectAnswer: string) {
     if (generatedQuiz) {
-      const updatedQuiz = [...generatedQuiz];
-      updatedQuiz[questionIndex].correctAnswer = newCorrectAnswer;
-      setGeneratedQuiz(updatedQuiz);
+      const updatedQuestions = [...generatedQuiz.questions];
+      updatedQuestions[questionIndex].correctAnswer = newCorrectAnswer;
+      setGeneratedQuiz({ ...generatedQuiz, questions: updatedQuestions });
     }
   }
 
@@ -102,6 +143,19 @@ export function CreateQuizForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6">
+             <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quiz Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., World Capitals Challenge" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="topic"
@@ -154,8 +208,8 @@ export function CreateQuizForm() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" disabled={isGenerating}>
+              {isGenerating ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Wand2 className="mr-2 h-4 w-4" />
@@ -169,7 +223,7 @@ export function CreateQuizForm() {
         <div className="border-t p-6">
           <h3 className="mb-4 text-xl font-bold font-headline">Review Generated Quiz</h3>
           <Accordion type="single" collapsible className="w-full">
-            {generatedQuiz.map((q, qIndex) => (
+            {generatedQuiz.questions.map((q, qIndex) => (
               <AccordionItem key={qIndex} value={`item-${qIndex}`}>
                 <AccordionTrigger className="font-headline text-left">Question {qIndex + 1}: {q.question}</AccordionTrigger>
                 <AccordionContent>
@@ -209,8 +263,12 @@ export function CreateQuizForm() {
             ))}
           </Accordion>
           <div className="mt-6 flex justify-end">
-            <Button onClick={handleSaveQuiz}>
-              <Save className="mr-2 h-4 w-4" />
+            <Button onClick={handleSaveQuiz} disabled={isSaving}>
+               {isSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
               Save Quiz
             </Button>
           </div>
@@ -219,4 +277,3 @@ export function CreateQuizForm() {
     </Card>
   );
 }
-

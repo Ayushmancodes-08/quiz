@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Quiz } from "@/lib/types";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle, CheckCircle, Clock, Loader2, ShieldOff, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { WithId } from "@/firebase";
 
 enum QuizState {
   Starting,
@@ -20,7 +22,7 @@ enum QuizState {
   Violation,
 }
 
-export function QuizTaker({ quiz }: { quiz: Quiz }) {
+export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   const [quizState, setQuizState] = useState(QuizState.Starting);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
