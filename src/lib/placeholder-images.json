@@ -1,3 +1,28 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-background",
+      "description": "Abstract cyberpunk city skyline with neon lights",
+      "imageUrl": "https://images.unsplash.com/photo-1561344640-2453889cde5b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Y3liZXJwdW5rJTIwY2l0eXxlbnwwfHx8fDE3NjI2NDcwOTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cyberpunk city"
+    },
+    {
+      "id": "feature-ai",
+      "description": "Glowing brain circuit diagram",
+      "imageUrl": "https://images.unsplash.com/photo-1697577418970-95d99b5a55cf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxhaSUyMGJyYWlufGVufDB8fHx8MTc2MjYwNjExNHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "ai brain"
+    },
+    {
+      "id": "feature-cheat",
+      "description": "A shield icon with a glowing circuit pattern",
+      "imageUrl": "https://images.unsplash.com/photo-1761805364441-6271530b0486?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxzZWN1cml0eSUyMHNoaWVsZHxlbnwwfHx8fDE3NjI2NjI1Mzd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "security shield"
+    },
+    {
+      "id": "feature-analytics",
+      "description": "A futuristic bar chart with glowing bars",
+      "imageUrl": "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxkYXRhJTIwY2hhcnR8ZW58MHx8fHwxNzYyNTc0NjgzfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "data chart"
+    }
+  ]
 }

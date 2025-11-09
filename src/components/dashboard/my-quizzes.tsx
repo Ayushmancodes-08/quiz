@@ -1,0 +1,97 @@
+"use client";
+
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { MoreHorizontal, Share2, Link as LinkIcon, Trash2, Play } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { MOCK_QUIZZES } from "@/lib/data";
+import { Badge } from "@/components/ui/badge";
+import Link from 'next/link';
+
+export function MyQuizzes() {
+  const { toast } = useToast();
+
+  const handleCopyLink = (quizId: string) => {
+    const url = `${window.location.origin}/quiz/${quizId}`;
+    navigator.clipboard.writeText(url);
+    toast({ title: "Link Copied!", description: "Quiz link copied to clipboard." });
+  };
+
+  const difficultyVariant = {
+    easy: "default",
+    medium: "secondary",
+    hard: "destructive",
+  } as const;
+
+  return (
+    <Table>
+      <TableCaption>A list of your generated quizzes.</TableCaption>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Title</TableHead>
+          <TableHead>Topic</TableHead>
+          <TableHead>Difficulty</TableHead>
+          <TableHead className="text-center">Questions</TableHead>
+          <TableHead>Created</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {MOCK_QUIZZES.map((quiz) => (
+          <TableRow key={quiz.id}>
+            <TableCell className="font-medium">{quiz.title}</TableCell>
+            <TableCell>{quiz.topic}</TableCell>
+            <TableCell>
+              <Badge variant={difficultyVariant[quiz.difficulty] || 'default'} className="capitalize">{quiz.difficulty}</Badge>
+            </TableCell>
+            <TableCell className="text-center">{quiz.questions.length}</TableCell>
+            <TableCell>{new Date(quiz.createdAt).toLocaleDateString()}</TableCell>
+            <TableCell className="text-right">
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/quiz/${quiz.id}`}><Play className="mr-2 h-4 w-4"/>Take</Link>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      <span>Share</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleCopyLink(quiz.id)}>
+                      <LinkIcon className="mr-2 h-4 w-4" />
+                      <span>Copy Link</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>Delete</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
