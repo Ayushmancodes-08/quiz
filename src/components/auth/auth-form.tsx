@@ -15,6 +15,7 @@ import Logo from "../shared/logo";
 import { setDocumentNonBlocking } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
+import type { UserCredential } from "firebase/auth";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -47,6 +48,18 @@ export default function AuthForm() {
     form.reset();
   }, [isLogin, form]);
 
+  const createUserProfile = (userCredential: UserCredential) => {
+    if (userCredential && userCredential.user && firestore) {
+      const userRef = doc(firestore, `users/${userCredential.user.uid}`);
+      const userData = {
+        id: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: userCredential.user.displayName,
+        createdAt: new Date().toISOString(),
+      }
+      setDocumentNonBlocking(userRef, userData, { merge: true });
+    }
+  }
 
   const onSubmit = async (data: z.infer<typeof loginSchema> | z.infer<typeof signupSchema>) => {
     try {
@@ -57,15 +70,8 @@ export default function AuthForm() {
         const { email, password, displayName } = data as z.infer<typeof signupSchema>;
         const userCredential = await signUpWithEmail(email, password, displayName);
         
-        if (userCredential && userCredential.user && firestore) {
-          const userRef = doc(firestore, `users/${userCredential.user.uid}`);
-          const userData = {
-            id: userCredential.user.uid,
-            email: userCredential.user.email,
-            displayName: userCredential.user.displayName,
-            createdAt: new Date().toISOString(),
-          }
-          setDocumentNonBlocking(userRef, userData, { merge: true });
+        if (userCredential) {
+          createUserProfile(userCredential);
         }
 
         toast({
@@ -86,15 +92,8 @@ export default function AuthForm() {
   const onGoogleSignIn = async () => {
     try {
       const userCredential = await signInWithGoogle();
-      if (userCredential && userCredential.user && firestore) {
-        const userRef = doc(firestore, `users/${userCredential.user.uid}`);
-        const userData = {
-          id: userCredential.user.uid,
-          email: userCredential.user.email,
-          displayName: userCredential.user.displayName,
-          createdAt: new Date().toISOString(),
-        }
-        setDocumentNonBlocking(userRef, userData, { merge: true });
+      if (userCredential) {
+        createUserProfile(userCredential);
       }
 
     } catch (error: any) {
