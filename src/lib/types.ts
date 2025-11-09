@@ -1,8 +1,7 @@
 export type User = {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'student';
+  uid: string;
+  displayName: string | null;
+  email: string | null;
 };
 
 export type Question = {

@@ -21,8 +21,7 @@ type UserAuthFormValues = z.infer<typeof authSchema>;
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = React.useState(true);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const { login } = useAuth();
+  const { loading, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
   const { toast } = useToast();
 
   const {
@@ -33,26 +32,37 @@ export default function AuthForm() {
     resolver: zodResolver(authSchema),
   });
 
-  const onSubmit = (data: UserAuthFormValues) => {
-    setIsLoading(true);
-    if (isLogin) {
-      login(data.email); // Mocked login
-    } else {
-      // Mocked signup
-      setTimeout(() => {
+  const onSubmit = async (data: UserAuthFormValues) => {
+    try {
+      if (isLogin) {
+        await signInWithEmail(data.email, data.password);
+      } else {
+        await signUpWithEmail(data.email, data.password);
         toast({
           title: "Account Created!",
           description: "You can now log in with your new credentials.",
         });
-        setIsLoading(false);
         setIsLogin(true); // Switch to login view after signup
-      }, 1000);
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Failed",
+        description: error.message || "An unknown error occurred.",
+      });
     }
   };
 
-  const onGoogleSignIn = () => {
-    setIsLoading(true);
-    login('google-user@quizmaster.ai'); // Mocked Google login
+  const onGoogleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (error: any) {
+       toast({
+        variant: "destructive",
+        title: "Google Sign-In Failed",
+        description: error.message || "Could not sign in with Google.",
+      });
+    }
   }
 
   return (
@@ -68,7 +78,7 @@ export default function AuthForm() {
               autoCapitalize="none"
               autoComplete="email"
               autoCorrect="off"
-              disabled={isLoading}
+              disabled={loading}
               {...register("email")}
             />
             {errors?.email && (
@@ -81,15 +91,15 @@ export default function AuthForm() {
               id="password"
               placeholder="••••••••"
               type="password"
-              disabled={isLoading}
+              disabled={loading}
               {...register("password")}
             />
              {errors?.password && (
               <p className="px-1 text-xs text-destructive">{errors.password.message}</p>
             )}
           </div>
-          <Button disabled={isLoading}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isLogin ? "Sign In" : "Sign Up"}
           </Button>
         </div>
@@ -102,8 +112,8 @@ export default function AuthForm() {
           <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
         </div>
       </div>
-      <Button variant="outline" type="button" disabled={isLoading} onClick={onGoogleSignIn}>
-        {isLoading ? (
+      <Button variant="outline" type="button" disabled={loading} onClick={onGoogleSignIn}>
+        {loading ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         ) : (
           <svg className="mr-2 h-4 w-4" viewBox="0 0 48 48">

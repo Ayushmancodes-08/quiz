@@ -1,64 +1,84 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { User } from '@/lib/types';
+import React, { createContext, useContext, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { 
+  useUser, 
+  useFirebase 
+} from '@/firebase';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
+} from 'firebase/auth';
+import type { User as FirebaseUser } from 'firebase/auth';
 
-// Mock user for demonstration
-const MOCK_ADMIN_USER: User = {
-  id: 'usr_admin001',
-  name: 'Admin',
-  email: 'admin@quizmaster.ai',
-  role: 'admin',
+// Define a user type that can be used in the app, separate from Firebase's
+export type AppUser = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
 };
 
 type AuthContextType = {
-  user: User | null;
-  login: (email: string) => void;
-  logout: () => void;
+  user: AppUser | null;
   loading: boolean;
+  signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, pass: string) => Promise<void>;
+  signUpWithEmail: (email: string, pass: string) => Promise<void>;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Helper to format Firebase user to app user
+const formatUser = (user: FirebaseUser): AppUser => ({
+  uid: user.uid,
+  email: user.email,
+  displayName: user.displayName,
+});
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user: firebaseUser, isUserLoading } = useUser();
+  const { auth } = useFirebase();
   const router = useRouter();
 
-  useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('quizmaster_user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-    } catch (error) {
-      console.error('Failed to parse user from localStorage', error);
-      localStorage.removeItem('quizmaster_user');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const appUser = firebaseUser ? formatUser(firebaseUser) : null;
+  
+  const signInWithGoogle = useCallback(async () => {
+    if (!auth) return;
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+    router.push('/dashboard');
+  }, [auth, router]);
 
-  const login = (email: string) => {
-    // In a real app, you'd call an API. Here we just mock it.
-    // For this demo, any login attempt succeeds and logs in the mock admin user.
-    setLoading(true);
-    setTimeout(() => {
-      localStorage.setItem('quizmaster_user', JSON.stringify(MOCK_ADMIN_USER));
-      setUser(MOCK_ADMIN_USER);
-      setLoading(false);
-      router.push('/dashboard');
-    }, 500);
-  };
+  const signUpWithEmail = useCallback(async (email: string, password: string): Promise<void> => {
+    if (!auth) throw new Error("Auth service not available.");
+    await createUserWithEmailAndPassword(auth, email, password);
+  }, [auth]);
 
-  const logout = () => {
-    localStorage.removeItem('quizmaster_user');
-    setUser(null);
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    if (!auth) throw new Error("Auth service not available.");
+    await signInWithEmailAndPassword(auth, email, password);
+    router.push('/dashboard');
+  }, [auth, router]);
+
+  const logout = useCallback(async () => {
+    if (!auth) return;
+    await signOut(auth);
     router.push('/auth');
-  };
+  }, [auth, router]);
 
-  const value = { user, login, logout, loading };
+  const value = {
+    user: appUser,
+    loading: isUserLoading,
+    signInWithGoogle,
+    signUpWithEmail,
+    signInWithEmail,
+    logout,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
