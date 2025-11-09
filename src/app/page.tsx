@@ -1,6 +1,11 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BrainCircuit, ShieldCheck, BarChart3, ChevronRight } from 'lucide-react';
+import { BrainCircuit, ShieldCheck, BarChart3, ChevronRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 const features = [
@@ -22,6 +27,24 @@ const features = [
 ];
 
 export default function Home() {
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, isUserLoading, router]);
+
+  if (isUserLoading || user) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <span className="sr-only">Loading...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-16 sm:py-24">
       <section className="text-center">
