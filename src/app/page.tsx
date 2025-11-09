@@ -49,7 +49,7 @@ export default function Home() {
       <section className="mt-24">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {features.map((feature, index) => (
-            <Card key={index} className="gradient-border bg-card/60 backdrop-blur-sm">
+            <Card key={index}>
               <CardHeader className="items-center text-center">
                 {feature.icon}
                 <CardTitle className="font-headline text-2xl text-glow-primary">{feature.title}</CardTitle>

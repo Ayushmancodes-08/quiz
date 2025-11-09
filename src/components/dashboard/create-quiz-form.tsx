@@ -135,7 +135,7 @@ export function CreateQuizForm() {
   }
 
   return (
-    <Card className="gradient-border bg-card/60 backdrop-blur-sm">
+    <Card>
       <CardHeader>
         <CardTitle className="font-headline">Generate a New Quiz</CardTitle>
         <CardDescription>Use AI to create a quiz on any topic in seconds.</CardDescription>
