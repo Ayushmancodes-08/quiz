@@ -12,8 +12,8 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SummarizeQuizResultsInputSchema = z.object({
-  quizName: z.string().describe('The name of the quiz.'),
-  results: z.string().describe('The quiz results in JSON format.'),
+  quizName: z.string().describe('The name of the quiz or context for the results.'),
+  results: z.string().describe('The quiz results in JSON format. Each result can contain quizTitle, score, violations, etc.'),
 });
 export type SummarizeQuizResultsInput = z.infer<typeof SummarizeQuizResultsInputSchema>;
 
@@ -30,16 +30,16 @@ const prompt = ai.definePrompt({
   name: 'summarizeQuizResultsPrompt',
   input: {schema: SummarizeQuizResultsInputSchema},
   output: {schema: SummarizeQuizResultsOutputSchema},
-  prompt: `You are an AI assistant that helps users analyze quiz results.
+  prompt: `You are an AI assistant that helps analyze quiz results for a user.
 
-You are given the name of the quiz and the results from various participants. The results are in JSON format.
+You are given a set of results from various participants across one or more quizzes. The results are in JSON format.
 
-Your job is to summarize the results, identify overall performance trends, and highlight any interesting patterns or outliers.
+Your job is to summarize the results, identify overall performance trends (like average scores, common difficult quizzes), and highlight any interesting patterns or outliers (like high violation counts or exceptionally high/low scores).
 
-Quiz Name: {{{quizName}}}
-Quiz Results: {{{results}}}
+Context: {{{quizName}}}
+Quiz Results Data: {{{results}}}
 
-Summary:`,
+Provide a concise, analytical summary:`,
 });
 
 const summarizeQuizResultsFlow = ai.defineFlow(

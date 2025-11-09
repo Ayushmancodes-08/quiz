@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -17,15 +17,16 @@ export function ResultsDashboard() {
   const { user } = useUser();
   const firestore = useFirestore();
 
+  // This query now fetches all attempts for quizzes where the authorId is the current user.
+  // This requires a composite index in Firestore on `authorId` and `completedAt`.
+  // The Firebase backend tools will prompt to create this index if it doesn't exist.
   const attemptsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    // Query all attempts made by any user on quizzes created by the current user.
-    // This requires a composite index on authorId and createdAt.
-    // For now, let's fetch the user's own attempts.
     return query(
-      collection(firestore, `users/${user.uid}/quiz_attempts`),
-      orderBy('completedAt', 'desc'),
-      limit(20)
+      collection(firestore, "quiz_attempts"), // Query the root collection
+      where("authorId", "==", user.uid), // Filter by the current user as the author
+      orderBy("completedAt", "desc"),
+      limit(50)
     );
   }, [user, firestore]);
 
@@ -34,25 +35,25 @@ export function ResultsDashboard() {
   useEffect(() => {
     async function getSummary() {
       if (!attempts || attempts.length === 0) {
-        setSummary('No quiz attempts recorded yet to generate a summary.');
+        setSummary('No quiz attempts have been recorded for your quizzes yet.');
         setIsSummaryLoading(false);
         return;
       }
 
       setIsSummaryLoading(true);
       const resultsJson = JSON.stringify(
-        attempts.map(a => ({ score: a.score, violations: a.violations }))
+        attempts.map(a => ({ quiz: a.quizTitle, score: a.score, violations: a.violations, flagged: a.isFlagged }))
       );
 
       const response = await summarizeResultsAction({
-        quizName: 'All Quizzes',
+        quizName: 'All Quizzes', // We can specify this, but the data contains individual quiz titles.
         results: resultsJson,
       });
 
       if (response.success && response.data) {
         setSummary(response.data.summary);
       } else {
-        setSummary('Could not generate AI summary.');
+        setSummary('Could not generate AI summary at this time.');
       }
       setIsSummaryLoading(false);
     }
@@ -60,6 +61,28 @@ export function ResultsDashboard() {
   }, [attempts]);
 
   const recentAttempts = (attempts as WithId<QuizAttempt>[]) || [];
+  
+  if (areAttemptsLoading && !attempts) {
+    return (
+      <div className="flex h-60 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-4 text-muted-foreground">Loading results...</span>
+      </div>
+    );
+  }
+
+  if (!areAttemptsLoading && (!recentAttempts || recentAttempts.length === 0)) {
+    return (
+         <Card>
+            <CardHeader>
+                <CardTitle className="font-headline text-glow-primary">Results Dashboard</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p className="py-8 text-center text-muted-foreground">No one has taken your quizzes yet. Share a quiz link to get started!</p>
+            </CardContent>
+        </Card>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -83,7 +106,7 @@ export function ResultsDashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline text-glow-primary">Score Distribution</CardTitle>
-            <CardDescription>Distribution of scores across all attempts.</CardDescription>
+            <CardDescription>Distribution of scores across all recent attempts.</CardDescription>
           </CardHeader>
           <CardContent>
             {areAttemptsLoading ? (
@@ -107,9 +130,7 @@ export function ResultsDashboard() {
                <div className="flex h-40 items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                </div>
-            ) : recentAttempts.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">No one has taken your quizzes yet.</p>
-          ) : (
+            ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -123,16 +144,16 @@ export function ResultsDashboard() {
             <TableBody>
               {recentAttempts.map((attempt) => (
                 <TableRow key={attempt.id}>
-                  <TableCell className="font-medium">{attempt.userName}</TableCell>
+                  <TableCell className="font-medium">{attempt.userName || 'Anonymous'}</TableCell>
                   <TableCell>{attempt.quizTitle}</TableCell>
                   <TableCell>
-                    <Badge variant={attempt.score > 70 ? 'default' : 'destructive'}>
+                    <Badge variant={attempt.score >= 70 ? 'default' : 'destructive'}>
                       {attempt.score}%
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    {attempt.isFlagged && (
-                      <span className="inline-flex items-center text-destructive">
+                    {(attempt.isFlagged || (attempt.violations && attempt.violations > 0)) && (
+                      <span title={`${attempt.violations || 0} violations`} className="inline-flex items-center text-destructive">
                         <TriangleAlert className="h-5 w-5" />
                       </span>
                     )}

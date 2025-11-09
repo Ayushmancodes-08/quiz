@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, CheckCircle, Clock, Loader2, ShieldOff, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, ShieldOff, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { WithId, useUser, useFirestore, addDocumentNonBlocking } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { WithId, useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 
 enum QuizState {
@@ -29,6 +29,8 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
   const [score, setScore] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [currentViolations, setCurrentViolations] = useState(0);
+
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useUser();
@@ -36,6 +38,8 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
 
   const handleViolation = useCallback(
     (reason: string) => {
+      // This check is important. If we are already submitting due to a violation,
+      // we don't want to trigger the submission logic again.
       if (quizState === QuizState.InProgress) {
         toast({
           variant: 'destructive',
@@ -43,14 +47,17 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
           description: reason,
         });
         setQuizState(QuizState.Violation);
-        // We submit the attempt upon violation
-        handleSubmit(true);
+        // The submission logic is now handled in the useEffect hook watching quizState
       }
     },
     [quizState, toast]
   );
 
   const { violationCount } = useAntiCheat({ enabled: quizState === QuizState.InProgress, onViolation: handleViolation });
+  
+  useEffect(() => {
+    setCurrentViolations(violationCount);
+  }, [violationCount]);
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
@@ -65,13 +72,12 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     }
   };
 
-  const handleSubmit = async (isViolation = false) => {
+  const calculateAndSaveAttempt = useCallback(async (isViolation = false) => {
     if (!user || !firestore || !startTime) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not submit quiz. User or session data missing.' });
+      setQuizState(QuizState.InProgress); // Revert state
       return;
     }
-
-    setQuizState(QuizState.Submitting);
 
     let correctAnswers = 0;
     quiz.questions.forEach((q, index) => {
@@ -83,8 +89,9 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     const finalScore = Math.round((correctAnswers / quiz.questions.length) * 100);
     setScore(finalScore);
 
+    const attemptId = uuidv4();
     const attempt: QuizAttempt = {
-      id: uuidv4(),
+      id: attemptId,
       quizId: quiz.id,
       quizTitle: quiz.title,
       userId: user.uid,
@@ -99,13 +106,14 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     };
 
     try {
-      // Save attempt to the quiz author's collection
-      const authorAttemptsRef = collection(firestore, `users/${quiz.authorId}/quiz_attempts`);
-      await addDocumentNonBlocking(authorAttemptsRef, attempt);
+      // Save attempt to the root `quiz_attempts` collection.
+      // This makes querying for results by author much easier.
+      const attemptsRef = doc(firestore, "quiz_attempts", attemptId);
+      await setDocumentNonBlocking(attemptsRef, attempt, {});
 
-      // Save attempt to the taker's own collection
-      const takerAttemptsRef = collection(firestore, `users/${user.uid}/quiz_attempts`);
-      await addDocumentNonBlocking(takerAttemptsRef, attempt);
+      // Optionally, still save a reference to the user's own attempts if needed for their history
+      const userAttemptRef = doc(firestore, `users/${user.uid}/quiz_attempts`, attemptId);
+      await setDocumentNonBlocking(userAttemptRef, attempt, {});
 
       setTimeout(() => {
         setQuizState(isViolation ? QuizState.Violation : QuizState.Finished);
@@ -119,7 +127,20 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
       });
       setQuizState(QuizState.InProgress); // Revert state
     }
-  };
+  }, [user, firestore, startTime, quiz, answers, violationCount]);
+
+  const handleSubmit = () => {
+     setQuizState(QuizState.Submitting);
+     calculateAndSaveAttempt(false);
+  }
+
+  useEffect(() => {
+    if (quizState === QuizState.Violation) {
+      // A violation has occurred, we must now submit the results.
+      setQuizState(QuizState.Submitting);
+      calculateAndSaveAttempt(true);
+    }
+  }, [quizState, calculateAndSaveAttempt]);
   
   useEffect(() => {
     if (quizState === QuizState.InProgress && !startTime) {
@@ -130,7 +151,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   useEffect(() => {
     if (quizState === QuizState.Violation || quizState === QuizState.Finished) {
       // After submission and result display, wait before redirecting
-      const timer = setTimeout(() => router.push('/dashboard'), 4000);
+      const timer = setTimeout(() => router.push('/dashboard'), 5000);
       return () => clearTimeout(timer);
     }
   }, [quizState, router]);
@@ -172,7 +193,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     } else if (quizState === QuizState.Violation) {
       FinalIcon = ShieldOff;
       title = 'Quiz Terminated';
-      description = `Your attempt was flagged with ${violationCount} violations. Final score: ${score}%.`;
+      description = `Your attempt was flagged with ${violationCount} violations and has been submitted. Final score: ${score}%.`;
     } else {
       FinalIcon = isSuccess ? CheckCircle : XCircle;
       title = 'Quiz Complete!';
@@ -203,7 +224,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
           <CardTitle className="font-headline text-xl">{quiz.title}</CardTitle>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4" /> {violationCount} / 3
+              <AlertCircle className="h-4 w-4" /> {currentViolations} / 3
             </span>
           </div>
         </div>
@@ -236,7 +257,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
             Next
           </Button>
         ) : (
-          <Button onClick={() => handleSubmit(false)} disabled={!answers[currentQuestionIndex]}>
+          <Button onClick={handleSubmit} disabled={!answers[currentQuestionIndex]}>
             Submit Quiz
           </Button>
         )}
