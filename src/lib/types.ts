@@ -24,8 +24,10 @@ export type QuizAttempt = {
   id: string; // UUID for the attempt
   quizId: string;
   quizTitle: string;
-  userId: string; // ID of the user who took the quiz
-  userName: string;
+  userId: string; // ID of the user who took the quiz (or 'anonymous' for unauthenticated users)
+  userName: string; // Display name (falls back to studentName for anonymous users)
+  studentName: string; // Student's name (required for result tracking)
+  registrationNumber: string; // Student's registration number (required for result tracking)
   authorId: string; // ID of the user who created the quiz
   answers: { [questionIndex: number]: string };
   score: number;

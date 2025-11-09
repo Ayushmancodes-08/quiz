@@ -4,7 +4,6 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import Logo from "../shared/logo";
 import { setDocumentNonBlocking } from "@/firebase";
 import { doc } from "firebase/firestore";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useFirebase } from "@/firebase";
+import { getRedirectResult } from "firebase/auth";
 import type { UserCredential } from "firebase/auth";
 
 const loginSchema = z.object({
@@ -34,6 +34,7 @@ export default function AuthForm() {
   const { loading, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { auth } = useFirebase();
 
   const form = useForm<z.infer<typeof loginSchema> | z.infer<typeof signupSchema>>({
     resolver: zodResolver(isLogin ? loginSchema : signupSchema),
@@ -48,7 +49,7 @@ export default function AuthForm() {
     form.reset();
   }, [isLogin, form]);
 
-  const createUserProfile = (userCredential: UserCredential) => {
+  const createUserProfile = React.useCallback((userCredential: UserCredential) => {
     if (userCredential && userCredential.user && firestore) {
       const userRef = doc(firestore, `users/${userCredential.user.uid}`);
       const userData = {
@@ -59,9 +60,36 @@ export default function AuthForm() {
       }
       setDocumentNonBlocking(userRef, userData, { merge: true });
     }
-  }
+  }, [firestore]);
 
-  const onSubmit = async (data: z.infer<typeof loginSchema> | z.infer<typeof signupSchema>) => {
+  // Handle redirect result from Google sign-in
+  React.useEffect(() => {
+    const handleRedirectResult = async () => {
+      if (!auth) return;
+      
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user && firestore) {
+          createUserProfile({
+            user: result.user,
+          } as UserCredential);
+        }
+      } catch (error: any) {
+        // Only show error if it's not a cancelled operation
+        if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+          toast({
+            variant: "destructive",
+            title: "Google Sign-In Failed",
+            description: error.message || "Could not sign in with Google.",
+          });
+        }
+      }
+    };
+
+    handleRedirectResult();
+  }, [auth, firestore, toast, createUserProfile]);
+
+  const onSubmit = React.useCallback(async (data: z.infer<typeof loginSchema> | z.infer<typeof signupSchema>) => {
     try {
       if (isLogin) {
         const { email, password } = data as z.infer<typeof loginSchema>;
@@ -87,15 +115,12 @@ export default function AuthForm() {
         description: error.message || "An unknown error occurred.",
       });
     }
-  };
+  }, [isLogin, signInWithEmail, signUpWithEmail, createUserProfile, toast]);
 
-  const onGoogleSignIn = async () => {
+  const onGoogleSignIn = React.useCallback(async () => {
     try {
-      const userCredential = await signInWithGoogle();
-      if (userCredential) {
-        createUserProfile(userCredential);
-      }
-
+      await signInWithGoogle();
+      // Redirect will happen automatically, result handled in useEffect
     } catch (error: any) {
        toast({
         variant: "destructive",
@@ -103,7 +128,7 @@ export default function AuthForm() {
         description: error.message || "Could not sign in with Google.",
       });
     }
-  }
+  }, [signInWithGoogle, toast]);
 
   const { register, handleSubmit, formState: { errors } } = form;
 

@@ -33,8 +33,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
 import { useUserQuizzes } from "@/hooks/use-user-quizzes";
-import { deleteDocumentNonBlocking, useFirestore } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
+import { doc, deleteDoc } from "firebase/firestore";
 
 export function MyQuizzes() {
   const { quizzes, isLoading, error } = useUserQuizzes();
@@ -47,14 +47,36 @@ export function MyQuizzes() {
     toast({ title: "Link Copied!", description: "Quiz link copied to clipboard." });
   };
   
-  const handleDelete = (quizId: string, userId: string) => {
+  const handleDelete = async (quizId: string, userId: string) => {
     if (!firestore) return;
-    const docRef = doc(firestore, `users/${userId}/quizzes/${quizId}`);
-    deleteDocumentNonBlocking(docRef);
-    toast({
-      title: "Quiz Deleted",
-      description: "The quiz has been removed from your list.",
-    });
+    
+    try {
+      // Delete from user's personal collection
+      const userDocRef = doc(firestore, `users/${userId}/quizzes/${quizId}`);
+      await deleteDoc(userDocRef);
+      
+      // Delete from public collection (handle case where older quizzes might not exist)
+      const publicDocRef = doc(firestore, `quizzes/${quizId}`);
+      try {
+        await deleteDoc(publicDocRef);
+      } catch (error: any) {
+        // Ignore errors if quiz doesn't exist in public collection (older quizzes)
+        if (error.code !== 'not-found') {
+          throw error;
+        }
+      }
+      
+      toast({
+        title: "Quiz Deleted",
+        description: "The quiz has been removed from your list.",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: error.message || "Could not delete the quiz.",
+      });
+    }
   }
 
   const difficultyVariant = {

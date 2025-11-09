@@ -21,5 +21,20 @@ export const MOCK_QUIZZES: Quiz[] = [
 
 
 export const MOCK_ATTEMPTS: QuizAttempt[] = [
-    { id: 'att_001', quizId: 'quiz_space_101', quizTitle: 'Cosmic Beginners', userId: 'usr_student01', userName: 'Alice', authorId: 'usr_admin001', score: 100, answers: {}, startedAt: '2024-05-23T10:00:00Z', completedAt: '2024-05-23T10:05:00Z', violations: 0, isFlagged: false },
+    { 
+      id: 'att_001', 
+      quizId: 'quiz_space_101', 
+      quizTitle: 'Cosmic Beginners', 
+      userId: 'usr_student01', 
+      userName: 'Alice', 
+      studentName: 'Alice Johnson',
+      registrationNumber: 'REG001',
+      authorId: 'usr_admin001', 
+      score: 100, 
+      answers: {}, 
+      startedAt: '2024-05-23T10:00:00Z', 
+      completedAt: '2024-05-23T10:05:00Z', 
+      violations: 0, 
+      isFlagged: false 
+    },
 ];

@@ -1,0 +1,26 @@
+# Copy this file to .env.local and fill in your values
+
+# ============================================
+# Firebase Configuration
+# ============================================
+# Get these from: Firebase Console > Project Settings > General > Your apps
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=studio-2319423145-218b4
+NEXT_PUBLIC_FIREBASE_APP_ID=1:165593041898:web:62e30c00e9ef8e51580093
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key_here
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=studio-2319423145-218b4.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=165593041898
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=studio-2319423145-218b4.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
+
+# ============================================
+# Google AI (Genkit) Configuration
+# ============================================
+# Get this from: https://aistudio.google.com/app/apikey
+# Required for AI quiz generation features
+GOOGLE_GENAI_API_KEY=your_google_genai_api_key_here
+
+# ============================================
+# Node Environment
+# ============================================
+NODE_ENV=development
+

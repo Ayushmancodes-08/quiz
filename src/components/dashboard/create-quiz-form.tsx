@@ -18,8 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { Question, Quiz } from '@/lib/types';
 import { Loader2, Save, Wand2 } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
-import { useFirestore, useUser, addDocumentNonBlocking } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
+import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   topic: z.string().min(3, 'Topic must be at least 3 characters long.'),
@@ -49,25 +49,34 @@ export function CreateQuizForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsGenerating(true);
     setGeneratedQuiz(null);
-    const result = await generateQuizAction(values);
-    setIsGenerating(false);
-    if (result.success && result.data) {
-      setGeneratedQuiz({
-        title: values.title,
-        topic: values.topic,
-        difficulty: values.difficulty,
-        questions: result.data.quiz,
-      });
-      toast({
-        title: 'Quiz Generated!',
-        description: 'Review and edit the questions below before saving.',
-      });
-    } else {
+    try {
+      const result = await generateQuizAction(values);
+      if (result.success && result.data) {
+        setGeneratedQuiz({
+          title: values.title,
+          topic: values.topic,
+          difficulty: values.difficulty,
+          questions: result.data.quiz,
+        });
+        toast({
+          title: 'Quiz Generated!',
+          description: 'Review and edit the questions below before saving.',
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Generation Failed',
+          description: result.error || 'An unknown error occurred.',
+        });
+      }
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Generation Failed',
-        description: result.error || 'An unknown error occurred.',
+        description: error.message || 'An unexpected error occurred while generating the quiz.',
       });
+    } finally {
+      setIsGenerating(false);
     }
   }
 
@@ -89,22 +98,86 @@ export function CreateQuizForm() {
       createdAt: new Date().toISOString(),
     };
 
+    // Validate authorId is set correctly
+    if (!quizToSave.authorId || quizToSave.authorId !== user.uid) {
+      console.error('Author ID validation failed:', { authorId: quizToSave.authorId, userId: user.uid });
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Author ID mismatch. Please try again.',
+      });
+      setIsSaving(false);
+      return;
+    }
+
     try {
-      const quizzesRef = collection(firestore, `users/${user.uid}/quizzes`);
-      await addDocumentNonBlocking(quizzesRef, quizToSave);
+      // Generate a document ID that will be used in both collections
+      const quizId = doc(collection(firestore, 'quizzes')).id;
+      console.log('Saving quiz with ID:', quizId);
+      
+      // Save to user's personal collection (using the same document ID)
+      const userQuizRef = doc(firestore, `users/${user.uid}/quizzes/${quizId}`);
+      try {
+        await setDoc(userQuizRef, { ...quizToSave, id: quizId });
+        console.log('Saved to user collection:', userQuizRef.path);
+      } catch (userError: any) {
+        console.error('Error saving to user collection:', userError);
+        if (userError.code === 'permission-denied') {
+          throw new Error('Permission denied: Unable to save to your personal collection. Please check Firestore rules.');
+        }
+        throw userError;
+      }
+      
+      // Save to public collection for sharing (using the same document ID)
+      const publicQuizRef = doc(firestore, `quizzes/${quizId}`);
+      try {
+        await setDoc(publicQuizRef, { ...quizToSave, id: quizId });
+        console.log('Saved to public collection:', publicQuizRef.path);
+      } catch (publicError: any) {
+        console.error('Error saving to public collection:', publicError);
+        // If public save fails, try to clean up user collection
+        try {
+          await deleteDoc(userQuizRef);
+        } catch (cleanupError) {
+          console.error('Error cleaning up user collection:', cleanupError);
+        }
+        
+        if (publicError.code === 'permission-denied') {
+          throw new Error('Permission denied: Unable to save to public collection. Please deploy Firestore rules using: npm run deploy:rules');
+        }
+        throw publicError;
+      }
       
       toast({
         title: 'Quiz Saved!',
-        description: 'The quiz is now available in "My Quizzes".',
+        description: 'The quiz is now available in "My Quizzes" and can be shared.',
       });
       setGeneratedQuiz(null);
       form.reset();
     } catch (error: any) {
-       toast({
-        variant: 'destructive',
-        title: 'Save Error',
-        description: error.message || 'Could not save the quiz to the database.',
-      });
+      console.error('Error saving quiz:', error);
+      const errorMessage = error.message || 'Could not save the quiz to the database.';
+      
+      // Provide specific error messages
+      if (error.code === 'permission-denied') {
+        toast({
+          variant: 'destructive',
+          title: 'Permission Denied',
+          description: 'Unable to save quiz. Please ensure Firestore rules are deployed. Run: npm run deploy:rules',
+        });
+      } else if (error.code === 'unavailable') {
+        toast({
+          variant: 'destructive',
+          title: 'Connection Error',
+          description: 'Unable to connect to Firebase. Please check your internet connection and try again.',
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Save Error',
+          description: errorMessage,
+        });
+      }
     } finally {
       setIsSaving(false);
     }

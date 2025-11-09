@@ -17,6 +17,7 @@ const GenerateQuizFromTopicInputSchema = z.object({
     .enum(['easy', 'medium', 'hard'])
     .describe('The difficulty of the quiz.'),
   numQuestions: z.number().int().positive().describe('The number of questions in the quiz.'),
+  title: z.string().optional().describe('The optional title of the quiz.'),
 });
 export type GenerateQuizFromTopicInput = z.infer<typeof GenerateQuizFromTopicInputSchema>;
 

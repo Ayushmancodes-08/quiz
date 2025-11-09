@@ -5,32 +5,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ScoreDistributionChart } from './score-distribution-chart';
+import { PerformanceTrendChart } from './performance-trend-chart';
+import { StudentStatistics } from './student-statistics';
+import { QuizBreakdown } from './quiz-breakdown';
+import { StudentsByQuiz } from './students-by-quiz';
 import { summarizeResultsAction } from '@/lib/actions';
 import { Loader2, TriangleAlert } from 'lucide-react';
-import { useUser, useFirestore, useCollection, useMemoFirebase, WithId } from '@/firebase';
+import { useUser, WithId } from '@/firebase';
 import type { QuizAttempt } from '@/lib/types';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { useFirebaseQuizAttempts } from '@/hooks/use-firebase-quiz-attempts';
 
 export function ResultsDashboard() {
   const [summary, setSummary] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(true);
   const { user } = useUser();
-  const firestore = useFirestore();
 
-  // This query now fetches all attempts for quizzes where the authorId is the current user.
-  // This requires a composite index in Firestore on `authorId` and `completedAt`.
-  // The Firebase backend tools will prompt to create this index if it doesn't exist.
-  const attemptsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(
-      collection(firestore, "quiz_attempts"), // Query the root collection
-      where("authorId", "==", user.uid), // Filter by the current user as the author
-      orderBy("completedAt", "desc"),
-      limit(50)
-    );
-  }, [user, firestore]);
-
-  const { data: attempts, isLoading: areAttemptsLoading } = useCollection<QuizAttempt>(attemptsQuery);
+  // Use Firebase for quiz attempts (real-time updates with Firestore)
+  const { attempts, isLoading: areAttemptsLoading, error: queryError } = useFirebaseQuizAttempts(
+    user?.uid || null
+  );
 
   useEffect(() => {
     async function getSummary() {
@@ -62,6 +55,41 @@ export function ResultsDashboard() {
 
   const recentAttempts = (attempts as WithId<QuizAttempt>[]) || [];
   
+  // Show error message if there's a permission error
+  if (queryError) {
+    const isPermissionError = queryError.message?.includes('permission') || 
+                             queryError.message?.includes('Permission') ||
+                             queryError.code === 'permission-denied';
+    
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-glow-primary text-destructive">Permission Error</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              {isPermissionError 
+                ? "Unable to load quiz attempts due to permission restrictions. Please ensure Firestore security rules are deployed."
+                : `Error loading quiz attempts: ${queryError.message}`}
+            </p>
+            {isPermissionError && (
+              <div className="rounded-lg bg-muted p-4 space-y-2">
+                <p className="font-semibold">To fix this issue:</p>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                  <li>Deploy the updated Firestore security rules to your Firebase project</li>
+                  <li>See <code className="bg-background px-1 rounded">FIREBASE_DEPLOYMENT.md</code> for instructions</li>
+                  <li>Ensure you're authenticated with a valid user account</li>
+                  <li>Verify the rules allow list operations on quiz_attempts for authenticated users</li>
+                </ol>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   if (areAttemptsLoading && !attempts) {
     return (
       <div className="flex h-60 items-center justify-center">
@@ -86,6 +114,12 @@ export function ResultsDashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Student Statistics Overview */}
+      {!areAttemptsLoading && recentAttempts.length > 0 && (
+        <StudentStatistics attempts={recentAttempts} />
+      )}
+
+      {/* AI Summary and Score Distribution */}
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -120,49 +154,39 @@ export function ResultsDashboard() {
         </Card>
       </div>
 
+      {/* Performance Trend Over Time */}
+      {!areAttemptsLoading && recentAttempts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline text-glow-primary">Performance Trend</CardTitle>
+            <CardDescription>Average score trends over time across all quiz attempts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PerformanceTrendChart data={recentAttempts} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quiz Breakdown */}
+      {!areAttemptsLoading && recentAttempts.length > 0 && (
+        <QuizBreakdown attempts={recentAttempts} />
+      )}
+
+      {/* Students Grouped by Quiz */}
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-glow-primary">Recent Attempts</CardTitle>
-          <CardDescription>A log of the most recent quiz attempts from your quizzes.</CardDescription>
+          <CardTitle className="font-headline text-glow-primary">Students by Quiz</CardTitle>
+          <CardDescription>
+            All students organized by quiz - click on a quiz to view all student attempts ({recentAttempts.length} total attempts)
+          </CardDescription>
         </CardHeader>
         <CardContent>
-           {areAttemptsLoading ? (
-               <div className="flex h-40 items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-               </div>
-            ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Quiz</TableHead>
-                <TableHead>Score</TableHead>
-                <TableHead className="text-center">Flagged</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentAttempts.map((attempt) => (
-                <TableRow key={attempt.id}>
-                  <TableCell className="font-medium">{attempt.userName || 'Anonymous'}</TableCell>
-                  <TableCell>{attempt.quizTitle}</TableCell>
-                  <TableCell>
-                    <Badge variant={attempt.score >= 70 ? 'default' : 'destructive'}>
-                      {attempt.score}%
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {(attempt.isFlagged || (attempt.violations && attempt.violations > 0)) && (
-                      <span title={`${attempt.violations || 0} violations`} className="inline-flex items-center text-destructive">
-                        <TriangleAlert className="h-5 w-5" />
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{new Date(attempt.completedAt).toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {areAttemptsLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <StudentsByQuiz attempts={recentAttempts} />
           )}
         </CardContent>
       </Card>

@@ -8,7 +8,8 @@ import {
 } from '@/firebase';
 import { 
   GoogleAuthProvider, 
-  signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -52,10 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     if (!auth) return;
     const provider = new GoogleAuthProvider();
-    const userCredential = await signInWithPopup(auth, provider);
-    router.push('/dashboard');
-    return userCredential;
-  }, [auth, router]);
+    await signInWithRedirect(auth, provider);
+    // Note: The redirect result will be handled in the auth form component
+  }, [auth]);
 
   const signUpWithEmail = useCallback(async (email: string, password: string, displayName: string): Promise<UserCredential | undefined> => {
     if (!auth) throw new Error("Auth service not available.");
