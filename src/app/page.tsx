@@ -5,17 +5,17 @@ import Link from 'next/link';
 
 const features = [
   {
-    icon: <BrainCircuit className="h-10 w-10 text-primary" />,
+    icon: <BrainCircuit className="h-10 w-10 text-primary text-glow-primary" />,
     title: 'AI-Powered Generation',
     description: 'Instantly generate quizzes on any topic with adjustable difficulty and length using Google Gemini.',
   },
   {
-    icon: <ShieldCheck className="h-10 w-10 text-primary" />,
+    icon: <ShieldCheck className="h-10 w-10 text-primary text-glow-primary" />,
     title: 'Advanced Anti-Cheat',
     description: 'Ensure integrity with fullscreen enforcement, tab switch detection, and more.',
   },
   {
-    icon: <BarChart3 className="h-10 w-10 text-primary" />,
+    icon: <BarChart3 className="h-10 w-10 text-primary text-glow-primary" />,
     title: 'Insightful Analytics',
     description: 'Track performance with detailed results, attempt history, and AI-powered summaries.',
   },
@@ -29,7 +29,7 @@ export default function Home() {
           <span className="text-glow-primary">QuizMaster</span>
           <span className="text-glow-secondary">AI</span>
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-foreground/80 md:text-xl">
           The future of assessments is here. Create, distribute, and analyze quizzes with the power of AI and a robust anti-cheat system.
         </p>
         <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
@@ -49,13 +49,13 @@ export default function Home() {
       <section className="mt-24">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {features.map((feature, index) => (
-            <Card key={index} className="gradient-border bg-card/50 backdrop-blur-sm">
-              <CardHeader className="items-center">
+            <Card key={index} className="gradient-border bg-card/60 backdrop-blur-sm">
+              <CardHeader className="items-center text-center">
                 {feature.icon}
-                <CardTitle className="font-headline text-2xl text-primary-foreground">{feature.title}</CardTitle>
+                <CardTitle className="font-headline text-2xl text-glow-primary">{feature.title}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-center text-muted-foreground">{feature.description}</p>
+                <p className="text-center text-foreground/70">{feature.description}</p>
               </CardContent>
             </Card>
           ))}

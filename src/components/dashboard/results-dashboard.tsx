@@ -37,9 +37,9 @@ export function ResultsDashboard() {
   return (
     <div className="space-y-8">
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 gradient-border bg-card/60 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="font-headline">AI Summary</CardTitle>
+            <CardTitle className="font-headline text-glow-primary">AI Summary</CardTitle>
             <CardDescription>An AI-generated overview of recent quiz performance.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -49,13 +49,13 @@ export function ResultsDashboard() {
                 <span>Generating summary...</span>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">{summary}</p>
+              <p className="text-sm text-foreground/80">{summary}</p>
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="gradient-border bg-card/60 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="font-headline">Score Distribution</CardTitle>
+            <CardTitle className="font-headline text-glow-primary">Score Distribution</CardTitle>
             <CardDescription>Distribution of scores across all attempts.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -64,9 +64,9 @@ export function ResultsDashboard() {
         </Card>
       </div>
       
-      <Card>
+      <Card className="gradient-border bg-card/60 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="font-headline">Recent Attempts</CardTitle>
+          <CardTitle className="font-headline text-glow-primary">Recent Attempts</CardTitle>
           <CardDescription>A log of the most recent quiz attempts.</CardDescription>
         </CardHeader>
         <CardContent>
