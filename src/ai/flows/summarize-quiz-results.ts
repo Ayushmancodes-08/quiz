@@ -30,11 +30,11 @@ const prompt = ai.definePrompt({
   name: 'summarizeQuizResultsPrompt',
   input: {schema: SummarizeQuizResultsInputSchema},
   output: {schema: SummarizeQuizResultsOutputSchema},
-  prompt: `You are an AI assistant that helps teachers understand how students are performing on quizzes.
+  prompt: `You are an AI assistant that helps users analyze quiz results.
 
-You are given the name of the quiz and the quiz results.  The quiz results are in JSON format.
+You are given the name of the quiz and the results from various participants. The results are in JSON format.
 
-Your job is to summarize the quiz results, and identify areas where students are struggling.
+Your job is to summarize the results, identify overall performance trends, and highlight any interesting patterns or outliers.
 
 Quiz Name: {{{quizName}}}
 Quiz Results: {{{results}}}
