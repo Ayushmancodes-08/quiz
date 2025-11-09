@@ -26,8 +26,8 @@ export default function Home() {
     <div className="container mx-auto px-4 py-16 sm:py-24">
       <section className="text-center">
         <h1 className="font-headline text-5xl font-bold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl">
-          <span className="text-glow-cyan">QuizMaster</span>
-          <span className="text-glow-magenta">AI</span>
+          <span className="text-glow-primary">QuizMaster</span>
+          <span className="text-glow-secondary">AI</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
           The future of assessments is here. Create, distribute, and analyze quizzes with the power of AI and a robust anti-cheat system.

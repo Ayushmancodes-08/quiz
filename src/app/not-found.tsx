@@ -5,7 +5,7 @@ import { Terminal } from 'lucide-react'
 export default function NotFound() {
   return (
     <div className="container mx-auto flex h-[calc(100vh-4rem)] flex-col items-center justify-center text-center">
-      <Terminal className="h-24 w-24 text-primary text-glow-cyan" />
+      <Terminal className="h-24 w-24 text-primary text-glow-primary" />
       <h1 className="mt-8 font-headline text-6xl font-bold">
         404
       </h1>
