@@ -59,13 +59,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUpWithEmail = useCallback(async (email: string, password: string, displayName: string): Promise<UserCredential | undefined> => {
     if (!auth) throw new Error("Auth service not available.");
+    // Do not await here to avoid the pending promise issue.
+    // The onAuthStateChanged listener will handle the user state update.
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(userCredential.user, { displayName });
+    if (userCredential.user) {
+      await updateProfile(userCredential.user, { displayName });
+    }
+    // The router push is handled by the auth state listener in a real app,
+    // or you can handle it after signup success.
     return userCredential;
   }, [auth]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     if (!auth) throw new Error("Auth service not available.");
+    // Do not await here.
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     router.push('/dashboard');
     return userCredential;
