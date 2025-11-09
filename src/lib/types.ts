@@ -16,16 +16,17 @@ export type Quiz = {
   topic: string;
   difficulty: 'easy' | 'medium' | 'hard';
   questions: Question[];
-  authorId: string; // Changed from createdBy to match backend schema
+  authorId: string;
   createdAt: string; // ISO date string
 };
 
 export type QuizAttempt = {
-  id: string;
+  id: string; // UUID for the attempt
   quizId: string;
   quizTitle: string;
-  userId: string;
+  userId: string; // ID of the user who took the quiz
   userName: string;
+  authorId: string; // ID of the user who created the quiz
   answers: { [questionIndex: number]: string };
   score: number;
   startedAt: string;

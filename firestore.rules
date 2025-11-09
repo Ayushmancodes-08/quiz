@@ -45,6 +45,13 @@ service cloud.firestore {
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
+    
+    /**
+     * @description Checks if the quiz author is the one making the request.
+     */
+    function isQuizAuthor(authorId) {
+      return isSignedIn() && request.auth.uid == authorId;
+    }
 
     /**
      * @description Security rules for user profiles.
@@ -60,54 +67,45 @@ service cloud.firestore {
       allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
-    }
 
-    /**
-     * @description Security rules for quizzes created by a user.
-     * @path /users/{userId}/quizzes/{quizId}
-     * @allow (create) Signed-in user with matching userId creates a quiz.
-     * @allow (get, update, delete) Signed-in user with matching userId accesses their quizzes.
-     * @deny (create) Signed-in user with mismatched userId attempts to create a quiz.
-     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
-     */
-    match /users/{userId}/quizzes/{quizId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.authorId == userId;
-      allow update: if isExistingOwner(userId) && resource.data.authorId == userId;
-      allow delete: if isExistingOwner(userId) && resource.data.authorId == userId;
-    }
+      /**
+       * @description Security rules for quizzes created by a user.
+       * @path /users/{userId}/quizzes/{quizId}
+       * @allow (create) Signed-in user with matching userId creates a quiz.
+       * @allow (get, update, delete) Signed-in user with matching userId accesses their quizzes.
+       * @deny (create) Signed-in user with mismatched userId attempts to create a quiz.
+       * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
+       */
+      match /quizzes/{quizId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.authorId == userId;
+        allow update: if isExistingOwner(userId) && resource.data.authorId == userId;
+        allow delete: if isExistingOwner(userId) && resource.data.authorId == userId;
 
-    /**
-     * @description Security rules for questions within a quiz.
-     * @path /users/{userId}/quizzes/{quizId}/questions/{questionId}
-     * @allow (create) Signed-in user with matching userId creates a question for their quiz.
-     * @allow (get, update, delete) Signed-in user with matching userId accesses questions for their quizzes.
-     * @deny (create) Signed-in user with mismatched userId attempts to create a question.
-     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
-     */
-    match /users/{userId}/quizzes/{quizId}/questions/{questionId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
+        /**
+         * @description Security rules for questions within a quiz.
+         * @path /users/{userId}/quizzes/{quizId}/questions/{questionId}
+         * @allow (create) Signed-in user with matching userId creates a question for their quiz.
+         * @allow (get, update, delete) Signed-in user with matching userId accesses questions for their quizzes.
+         * @deny (create) Signed-in user with mismatched userId attempts to create a question.
+         * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
+         */
+        match /questions/{questionId} {
+            allow read, write: if isOwner(userId);
+        }
+      }
 
-    /**
-     * @description Security rules for quiz attempts made by a user.
-     * @path /users/{userId}/quiz_attempts/{quizAttemptId}
-     * @allow (create) Signed-in user with matching userId creates a quiz attempt.
-     * @allow (get, update, delete) Signed-in user with matching userId accesses their quiz attempts.
-     * @deny (create) Signed-in user with mismatched userId attempts to create a quiz attempt.
-     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
-     */
-    match /users/{userId}/quiz_attempts/{quizAttemptId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+      /**
+       * @description Security rules for quiz attempts made by a user.
+       * A user can create their own attempt. The quiz author can read attempts for their quizzes.
+       */
+      match /quiz_attempts/{quizAttemptId} {
+        allow get, list, update, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        // Allow the quiz author to read the attempts for their own quizzes
+        allow get, list: if isSignedIn() && isQuizAuthor(resource.data.authorId);
+      }
     }
   }
 }
