@@ -42,7 +42,7 @@ const prompt = ai.definePrompt({
   name: 'generateQuizFromTopicPrompt',
   input: {schema: GenerateQuizFromTopicInputSchema},
   output: {schema: GenerateQuizFromTopicOutputSchema},
-  prompt: `You are a quiz generator AI. Generate a quiz on the topic of {{{topic}}} with {{{numQuestions}}} questions of {{{difficulty}}} difficulty.
+  prompt: `You are a quiz generator AI. Generate a unique quiz on the topic of {{{topic}}} with {{{numQuestions}}} questions of {{{difficulty}}} difficulty. Do not repeat questions you have generated before for this topic.
 
       The quiz should be returned as a JSON array of question objects.
 
