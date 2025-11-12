@@ -1,0 +1,13 @@
+node_modules
+.next
+.env*
+!.env.example
+.git
+.gitignore
+.idx
+.genkit
+*.log
+.DS_Store
+coverage
+scripts
+docs

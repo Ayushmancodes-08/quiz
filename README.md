@@ -285,18 +285,25 @@ npm run typecheck    # Run TypeScript checks
 
 ### Vercel (Recommended)
 
-1. Push your code to GitHub
-2. Import project in Vercel
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/quizmasterai)
+
+**Quick Steps:**
+1. Push code to GitHub
+2. Import to Vercel
 3. Add environment variables
 4. Deploy
 
-### Other Platforms
+**See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions**
 
-The app can be deployed to any platform that supports Next.js:
-- Netlify
-- Railway
-- Render
-- Self-hosted
+### Performance Features
+
+- ✅ Automatic image optimization (AVIF/WebP)
+- ✅ Edge caching and CDN
+- ✅ Code splitting and lazy loading
+- ✅ Security headers (CSP, HSTS, etc.)
+- ✅ PWA support with manifest
+- ✅ SEO optimized with metadata
+- ✅ Compression enabled
 
 ## Troubleshooting
 

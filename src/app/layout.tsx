@@ -7,12 +7,57 @@ import Header from '@/components/shared/header';
 import { SupabaseProvider } from '@/supabase/provider';
 
 export const metadata: Metadata = {
-  title: 'QuizMasterAI',
-  description: 'AI-Powered Quiz Generation and Anti-Cheat Platform',
+  title: {
+    default: 'QuizMasterAI - AI-Powered Quiz Platform',
+    template: '%s | QuizMasterAI',
+  },
+  description: 'Create AI-powered quizzes with advanced anti-cheat features. Real-time analytics, leaderboards, and comprehensive quiz management for educators.',
+  keywords: ['quiz', 'AI', 'education', 'anti-cheat', 'online testing', 'quiz generator', 'assessment'],
+  authors: [{ name: 'QuizMasterAI Team' }],
+  creator: 'QuizMasterAI',
+  publisher: 'QuizMasterAI',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: '/',
+    title: 'QuizMasterAI - AI-Powered Quiz Platform',
+    description: 'Create AI-powered quizzes with advanced anti-cheat features',
+    siteName: 'QuizMasterAI',
+    images: [
+      {
+        url: '/icon.svg',
+        width: 1200,
+        height: 630,
+        alt: 'QuizMasterAI',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'QuizMasterAI - AI-Powered Quiz Platform',
+    description: 'Create AI-powered quizzes with advanced anti-cheat features',
+    images: ['/icon.svg'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   icons: {
     icon: '/icon.svg',
     apple: '/icon.svg',
   },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
