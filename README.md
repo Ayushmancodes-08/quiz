@@ -283,18 +283,26 @@ npm run typecheck    # Run TypeScript checks
 
 ## Deployment
 
-The app can be deployed to any platform that supports Next.js:
+The app can be deployed to any platform that supports Next.js.
 
-- **Cloud Platforms** - Any Next.js compatible hosting
-- **Self-hosted** - Docker or VPS
-- **Container Services** - Kubernetes, Docker Swarm
+### Important: Environment Variables
+
+**You MUST set `NEXT_PUBLIC_APP_URL` to your production domain:**
+
+```env
+NEXT_PUBLIC_APP_URL=https://your-domain.com
+```
+
+This prevents authentication redirects to localhost.
 
 ### Deployment Steps
 
-1. Build the application: `npm run build`
-2. Set environment variables
+1. Set environment variables (see `.env.local` for reference)
+2. Build the application: `npm run build`
 3. Start production server: `npm start`
-4. Configure reverse proxy (nginx, Apache)
+4. Update Supabase redirect URLs
+
+**See [DEPLOYMENT_SETUP.md](./DEPLOYMENT_SETUP.md) for detailed instructions.**
 
 ### Performance Features
 
