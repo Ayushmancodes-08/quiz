@@ -25,6 +25,14 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
   const isDisabledRef = useRef(false);
   const automationCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const onViolationRef = useRef(onViolation);
+  const maxViolationsRef = useRef(maxViolations);
+
+  useEffect(() => {
+    onViolationRef.current = onViolation;
+    maxViolationsRef.current = maxViolations;
+  }, [onViolation, maxViolations]);
+
   const triggerViolation = useCallback((type: ViolationType, reason: string, details?: string) => {
     if (isDisabledRef.current) return;
 
@@ -34,10 +42,10 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     setViolationRecords(prev => {
       const updated = [...prev, record];
       
-      if (updated.length >= maxViolations) {
+      if (updated.length >= maxViolationsRef.current) {
         isDisabledRef.current = true;
         setTimeout(() => {
-          onViolation(`Exceeded maximum violations (${maxViolations}).`, updated);
+          onViolationRef.current(`Exceeded maximum violations (${maxViolationsRef.current}).`, updated);
         }, 0);
       }
       
@@ -51,13 +59,13 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
         toast({
           variant: 'destructive',
           title: `Violation Detected: ${reason}`,
-          description: `${details || reason} (${newCount}/${maxViolations} violations).`,
+          description: `${details || reason} (${newCount}/${maxViolationsRef.current} violations).`,
         });
       }, 0);
       
       return newCount;
     });
-  }, [onViolation, maxViolations, toast]);
+  }, [toast]);
 
   // 1. Detect browser/tab changes
   const handleVisibilityChange = useCallback(() => {
@@ -242,203 +250,203 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
 
   // Monitor for screenshot tools that might use canvas or other methods
   useEffect(() => {
-    if (enabled && !isDisabledRef.current) {
-      // Override canvas methods to detect screenshot attempts
-      const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
-      const originalToBlob = HTMLCanvasElement.prototype.toBlob;
-      const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData;
-      
-      HTMLCanvasElement.prototype.toDataURL = function(...args: any[]) {
-        triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas export is disabled (possible screenshot tool).');
-        return '';
-      };
-      
-      HTMLCanvasElement.prototype.toBlob = function(...args: any[]) {
-        triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas export is disabled (possible screenshot tool).');
-        if (args[0]) args[0](null);
-      };
-      
-      CanvasRenderingContext2D.prototype.getImageData = function(...args: any[]) {
-        triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas image data access is disabled (possible screenshot tool).');
-        return new ImageData(1, 1);
-      };
+    if (!enabled || isDisabledRef.current) return;
 
-      // Detect Circle to Search through image search APIs
-      // Override fetch to detect image search requests
-      const originalFetch = window.fetch;
-      window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
-        const url = input.toString();
-        if (url.includes('lens.google.com') || 
-            url.includes('google.com/searchbyimage') ||
-            url.includes('reverse-image-search') ||
-            (url.includes('google.com') && url.includes('image'))) {
-          triggerViolation('circle_to_search', 'Circle to Search Detected', 'Image search detected (Circle to Search).');
-        }
-        return originalFetch.call(this, input, init);
-      };
+    // Override canvas methods to detect screenshot attempts
+    const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+    const originalToBlob = HTMLCanvasElement.prototype.toBlob;
+    const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+    
+    HTMLCanvasElement.prototype.toDataURL = function(...args: any[]) {
+      triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas export is disabled (possible screenshot tool).');
+      return '';
+    };
+    
+    HTMLCanvasElement.prototype.toBlob = function(...args: any[]) {
+      triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas export is disabled (possible screenshot tool).');
+      if (args[0]) args[0](null);
+    };
+    
+    CanvasRenderingContext2D.prototype.getImageData = function(...args: any[]) {
+      triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas image data access is disabled (possible screenshot tool).');
+      return new ImageData(1, 1);
+    };
 
-      return () => {
-        HTMLCanvasElement.prototype.toDataURL = originalToDataURL;
-        HTMLCanvasElement.prototype.toBlob = originalToBlob;
-        CanvasRenderingContext2D.prototype.getImageData = originalGetImageData;
-        window.fetch = originalFetch;
-      };
-    }
+    // Detect Circle to Search through image search APIs
+    // Override fetch to detect image search requests
+    const originalFetch = window.fetch;
+    window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
+      const url = input.toString();
+      if (url.includes('lens.google.com') || 
+          url.includes('google.com/searchbyimage') ||
+          url.includes('reverse-image-search') ||
+          (url.includes('google.com') && url.includes('image'))) {
+        triggerViolation('circle_to_search', 'Circle to Search Detected', 'Image search detected (Circle to Search).');
+      }
+      return originalFetch.call(this, input, init);
+    };
+
+    return () => {
+      HTMLCanvasElement.prototype.toDataURL = originalToDataURL;
+      HTMLCanvasElement.prototype.toBlob = originalToBlob;
+      CanvasRenderingContext2D.prototype.getImageData = originalGetImageData;
+      window.fetch = originalFetch;
+    };
   }, [enabled, triggerViolation]);
 
   useEffect(() => {
-    if (enabled) {
-      // Reset state when enabled
-      isDisabledRef.current = false;
-      setViolationCount(0);
-      setViolationRecords([]);
+    if (!enabled) return;
 
-      // Run automation detection immediately and periodically
+    // Reset state when enabled
+    isDisabledRef.current = false;
+    setViolationCount(0);
+    setViolationRecords([]);
+
+    // Run automation detection immediately and periodically
+    detectAutomation();
+    automationCheckIntervalRef.current = setInterval(() => {
       detectAutomation();
-      automationCheckIntervalRef.current = setInterval(() => {
-        detectAutomation();
-      }, 5000); // Check every 5 seconds
+    }, 5000); // Check every 5 seconds
 
-      let wakeLock: any = null;
+    let wakeLock: any = null;
 
-      // 1. Enter fullscreen mode
-      const enterFullscreen = async () => {
-        try {
-          await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-          console.log('Fullscreen mode activated');
-        } catch (err: any) {
-          console.warn(`Fullscreen error: ${err.message}`);
+    // 1. Enter fullscreen mode
+    const enterFullscreen = async () => {
+      try {
+        await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+        console.log('Fullscreen mode activated');
+      } catch (err: any) {
+        console.warn(`Fullscreen error: ${err.message}`);
+      }
+    };
+
+    // 2. Request keyboard lock (prevents Alt+Tab, Windows key, etc.)
+    const lockKeyboard = async () => {
+      try {
+        if ('keyboard' in navigator && 'lock' in (navigator as any).keyboard) {
+          await (navigator as any).keyboard.lock([
+            'Escape',
+            'MetaLeft', 'MetaRight', // Windows/Command key
+            'AltLeft', 'AltRight',
+            'Tab',
+            'ContextMenu',
+          ]);
+          console.log('Keyboard locked');
         }
-      };
+      } catch (err: any) {
+        console.warn(`Keyboard lock error: ${err.message}`);
+      }
+    };
 
-      // 2. Request keyboard lock (prevents Alt+Tab, Windows key, etc.)
-      const lockKeyboard = async () => {
-        try {
-          if ('keyboard' in navigator && 'lock' in (navigator as any).keyboard) {
-            await (navigator as any).keyboard.lock([
-              'Escape',
-              'MetaLeft', 'MetaRight', // Windows/Command key
-              'AltLeft', 'AltRight',
-              'Tab',
-              'ContextMenu',
-            ]);
-            console.log('Keyboard locked');
+    // 3. Request wake lock (prevents screen from sleeping)
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+          console.log('Wake lock activated');
+          
+          wakeLock.addEventListener('release', () => {
+            console.log('Wake lock released');
+          });
+        }
+      } catch (err: any) {
+        console.warn(`Wake lock error: ${err.message}`);
+      }
+    };
+
+    // 4. Monitor fullscreen exit attempts
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && !isDisabledRef.current) {
+        // User exited fullscreen - try to re-enter
+        setTimeout(() => {
+          if (!isDisabledRef.current) {
+            enterFullscreen();
+            triggerViolation('browser_change', 'Fullscreen Exit Attempt', 'You must stay in fullscreen mode.');
           }
-        } catch (err: any) {
-          console.warn(`Keyboard lock error: ${err.message}`);
-        }
-      };
+        }, 100);
+      }
+    };
 
-      // 3. Request wake lock (prevents screen from sleeping)
-      const requestWakeLock = async () => {
-        try {
-          if ('wakeLock' in navigator) {
-            wakeLock = await (navigator as any).wakeLock.request('screen');
-            console.log('Wake lock activated');
-            
-            wakeLock.addEventListener('release', () => {
-              console.log('Wake lock released');
-            });
-          }
-        } catch (err: any) {
-          console.warn(`Wake lock error: ${err.message}`);
-        }
-      };
+    // Initialize all locks
+    enterFullscreen();
+    lockKeyboard();
+    requestWakeLock();
 
-      // 4. Monitor fullscreen exit attempts
-      const handleFullscreenChange = () => {
-        if (!document.fullscreenElement && !isDisabledRef.current) {
-          // User exited fullscreen - try to re-enter
-          setTimeout(() => {
-            if (!isDisabledRef.current) {
-              enterFullscreen();
-              triggerViolation('browser_change', 'Fullscreen Exit Attempt', 'You must stay in fullscreen mode.');
-            }
-          }, 100);
-        }
-      };
+    // Add event listeners
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // Disable text selection
+    document.body.style.userSelect = 'none';
+    
+    // Disable drag and drop
+    document.body.addEventListener('dragstart', (e) => e.preventDefault());
+    document.body.addEventListener('drop', (e) => e.preventDefault());
 
-      // Initialize all locks
-      enterFullscreen();
-      lockKeyboard();
-      requestWakeLock();
-
-      // Add event listeners
-      document.addEventListener('fullscreenchange', handleFullscreenChange);
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      document.addEventListener('contextmenu', handleContextMenu);
-      window.addEventListener('keydown', handleKeyDown);
-      
-      // Disable text selection
-      document.body.style.userSelect = 'none';
-      
-      // Disable drag and drop
-      document.body.addEventListener('dragstart', (e) => e.preventDefault());
-      document.body.addEventListener('drop', (e) => e.preventDefault());
-
-      // Block common exit shortcuts
-      const blockExitShortcuts = (e: KeyboardEvent) => {
-        // Block Alt+F4 (Windows close)
-        if (e.altKey && e.key === 'F4') {
-          e.preventDefault();
-          triggerViolation('browser_change', 'Exit Attempt', 'Alt+F4 is disabled.');
-        }
-        // Block Ctrl+W (close tab)
-        if (e.ctrlKey && e.key === 'w') {
-          e.preventDefault();
-          triggerViolation('browser_change', 'Exit Attempt', 'Ctrl+W is disabled.');
-        }
-        // Block Ctrl+Q (quit browser)
-        if (e.ctrlKey && e.key === 'q') {
-          e.preventDefault();
-          triggerViolation('browser_change', 'Exit Attempt', 'Ctrl+Q is disabled.');
-        }
-        // Block F11 (fullscreen toggle)
-        if (e.key === 'F11') {
-          e.preventDefault();
-        }
-      };
-      window.addEventListener('keydown', blockExitShortcuts);
-
-      // Warn before leaving page
-      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    // Block common exit shortcuts
+    const blockExitShortcuts = (e: KeyboardEvent) => {
+      // Block Alt+F4 (Windows close)
+      if (e.altKey && e.key === 'F4') {
         e.preventDefault();
-        e.returnValue = 'Are you sure you want to leave? Your quiz progress may be lost.';
-        return e.returnValue;
-      };
-      window.addEventListener('beforeunload', handleBeforeUnload);
+        triggerViolation('browser_change', 'Exit Attempt', 'Alt+F4 is disabled.');
+      }
+      // Block Ctrl+W (close tab)
+      if (e.ctrlKey && e.key === 'w') {
+        e.preventDefault();
+        triggerViolation('browser_change', 'Exit Attempt', 'Ctrl+W is disabled.');
+      }
+      // Block Ctrl+Q (quit browser)
+      if (e.ctrlKey && e.key === 'q') {
+        e.preventDefault();
+        triggerViolation('browser_change', 'Exit Attempt', 'Ctrl+Q is disabled.');
+      }
+      // Block F11 (fullscreen toggle)
+      if (e.key === 'F11') {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', blockExitShortcuts);
 
-      // Cleanup
-      return () => {
-        if (automationCheckIntervalRef.current) {
-          clearInterval(automationCheckIntervalRef.current);
-          automationCheckIntervalRef.current = null;
-        }
-        
-        // Release all locks
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
-        }
-        if ('keyboard' in navigator && 'unlock' in (navigator as any).keyboard) {
-          (navigator as any).keyboard.unlock();
-        }
-        if (wakeLock) {
-          wakeLock.release().catch(() => {});
-        }
+    // Warn before leaving page
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Are you sure you want to leave? Your quiz progress may be lost.';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
-        // Remove event listeners
-        document.removeEventListener('fullscreenchange', handleFullscreenChange);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        document.removeEventListener('contextmenu', handleContextMenu);
-        window.removeEventListener('keydown', handleKeyDown);
-        window.removeEventListener('keydown', blockExitShortcuts);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        
-        document.body.style.userSelect = 'auto';
-        isDisabledRef.current = false;
-      };
-    }
-  }, [enabled, handleVisibilityChange, handleContextMenu, handleKeyDown, detectAutomation, triggerViolation]);
+    // Cleanup
+    return () => {
+      if (automationCheckIntervalRef.current) {
+        clearInterval(automationCheckIntervalRef.current);
+        automationCheckIntervalRef.current = null;
+      }
+      
+      // Release all locks
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      if ('keyboard' in navigator && 'unlock' in (navigator as any).keyboard) {
+        (navigator as any).keyboard.unlock();
+      }
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+      }
+
+      // Remove event listeners
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', blockExitShortcuts);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      document.body.style.userSelect = 'auto';
+      isDisabledRef.current = false;
+    };
+  }, [enabled, handleVisibilityChange, handleContextMenu, handleKeyDown, detectAutomation]);
 
   return { violationCount, violationRecords };
 }

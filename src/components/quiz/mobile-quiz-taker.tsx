@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, CheckCircle, Loader2, ShieldOff, XCircle, Shield, Eye, Home } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, Home, Shield, ShieldOff, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { WithId, useUser, useSupabaseClient } from '@/supabase';
@@ -79,7 +79,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   );
 
   const { violationCount, violationRecords } = useAntiCheat({
-    enabled: quizState === QuizState.InProgress,
+    enabled: false,
     onViolation: handleViolation,
     maxViolations: 3,
   });
@@ -560,17 +560,8 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   }
 
   // Store attempt ID when quiz is finished
-  useEffect(() => {
-    if (quizState === QuizState.Finished && !attemptIdRef.current) {
-      const lastAttemptId = localStorage.getItem('lastQuizAttemptId');
-      if (lastAttemptId) {
-        attemptIdRef.current = lastAttemptId;
-      }
-    }
-  }, [quizState]);
-
-  // Finished state
-  if (quizState === QuizState.Finished) {
+  // Finished state - Show only the score
+  if (quizState === QuizState.Finished || quizState === QuizState.Violation) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-green-500/5">
         <Card className="w-full max-w-2xl text-center shadow-2xl">
@@ -585,79 +576,9 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
             <div className="bg-muted/50 p-8 rounded-lg space-y-4">
               <div className="text-6xl md:text-7xl font-bold text-primary">{score}%</div>
               <p className="text-lg text-muted-foreground">Your Score</p>
-              <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
-                <div className="bg-background p-4 rounded-lg">
-                  <p className="text-muted-foreground">Correct Answers</p>
-                  <p className="text-2xl font-bold">{Math.round((score / 100) * quiz.questions.length)}/{quiz.questions.length}</p>
-                </div>
-                <div className="bg-background p-4 rounded-lg">
-                  <p className="text-muted-foreground">Violations</p>
-                  <p className="text-2xl font-bold">{violationCount}</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
-                onClick={() => {
-                  const lastAttemptId = localStorage.getItem('lastQuizAttemptId');
-                  if (lastAttemptId) {
-                    router.push(`/quiz/review/${lastAttemptId}`);
-                  }
-                }}
-                variant="outline"
-                size="lg"
-                className="flex-1 h-12 text-base font-semibold"
-              >
-                <Eye className="mr-2 h-5 w-5" />
-                Review Answers
-              </Button>
-              <Button 
-                onClick={() => router.push('/')} 
-                size="lg"
-                className="flex-1 h-12 text-base font-semibold"
-              >
-                <Home className="mr-2 h-5 w-5" />
-                Return to Home
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Violation state
-  if (quizState === QuizState.Violation) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-destructive/5">
-        <Card className="w-full max-w-2xl text-center shadow-2xl border-destructive">
-          <CardContent className="pt-12 pb-12 space-y-8">
-            <div className="flex items-center justify-center w-24 h-24 mx-auto bg-destructive/10 rounded-full">
-              <ShieldOff className="w-16 h-16 text-destructive" />
-            </div>
-            <div className="space-y-4">
-              <h2 className="text-3xl md:text-4xl font-bold font-headline text-destructive">Quiz Terminated</h2>
-              <p className="text-xl text-muted-foreground">Maximum violations reached</p>
-            </div>
-            <div className="bg-destructive/10 p-8 rounded-lg space-y-4">
-              <p className="text-lg">Your quiz has been automatically submitted due to multiple violations of the anti-cheat rules.</p>
-              <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
-                <div className="bg-background p-4 rounded-lg">
-                  <p className="text-muted-foreground">Final Score</p>
-                  <p className="text-2xl font-bold">{score}%</p>
-                </div>
-                <div className="bg-background p-4 rounded-lg">
-                  <p className="text-muted-foreground">Violations</p>
-                  <p className="text-2xl font-bold text-destructive">{violationCount}</p>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground mt-4">
-                This attempt has been flagged for review by the quiz creator.
-              </p>
             </div>
             <Button 
               onClick={() => router.push('/')} 
-              variant="destructive"
               size="lg"
               className="w-full h-12 text-base font-semibold"
             >

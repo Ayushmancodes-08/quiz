@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, CheckCircle, Loader2, ShieldOff, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { WithId, useUser, useSupabaseClient } from '@/supabase';
@@ -272,12 +272,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     }
   }, [quizState, startTime]);
 
-  useEffect(() => {
-    if (quizState === QuizState.Violation || quizState === QuizState.Finished) {
-      const timer = setTimeout(() => router.push('/dashboard'), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [quizState, router]);
+
 
   // Collecting student information
   if (quizState === QuizState.CollectingInfo) {
@@ -383,37 +378,37 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     );
   }
 
-  // Finished/Submitting/Violation states
-  if (quizState === QuizState.Finished || quizState === QuizState.Submitting || quizState === QuizState.Violation) {
-    const isSuccess = score >= 70;
-    let FinalIcon, title, description;
-
-    if (quizState === QuizState.Submitting) {
-      FinalIcon = Loader2;
-      title = 'Submitting...';
-      description = 'Calculating your score and saving the attempt...';
-    } else if (quizState === QuizState.Violation) {
-      FinalIcon = ShieldOff;
-      title = 'Quiz Terminated';
-      description = `Your attempt was flagged with ${violationCount} violations and has been submitted. Final score: ${score}%.`;
-    } else {
-      FinalIcon = isSuccess ? CheckCircle : XCircle;
-      title = 'Quiz Complete!';
-      description = `You scored ${score}%.`;
-    }
-
+  // Submitting state
+  if (quizState === QuizState.Submitting) {
     return (
       <Card className="w-full max-w-2xl text-center">
         <CardHeader className="items-center">
-            <FinalIcon className={`h-16 w-16 ${quizState === QuizState.Submitting ? 'animate-spin text-primary' : quizState === QuizState.Violation ? 'text-destructive' : isSuccess ? 'text-green-500' : 'text-destructive'}`} />
+          <Loader2 className="h-16 w-16 animate-spin text-primary" />
         </CardHeader>
         <CardContent>
-          <CardTitle className="font-headline text-3xl">{title}</CardTitle>
-          <CardDescription className="mt-2">{description}</CardDescription>
+          <CardTitle className="font-headline text-3xl">Submitting...</CardTitle>
+          <CardDescription className="mt-2">Calculating your score...</CardDescription>
         </CardContent>
-        <CardFooter className="flex-col gap-4">
+      </Card>
+    );
+  }
+
+  // Finished state - Show only the score
+  if (quizState === QuizState.Finished || quizState === QuizState.Violation) {
+    return (
+      <Card className="w-full max-w-2xl text-center">
+        <CardHeader className="items-center">
+          <CheckCircle className="h-16 w-16 text-green-500" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <CardTitle className="font-headline text-3xl">Quiz Complete!</CardTitle>
+          <div className="bg-muted/50 p-8 rounded-lg">
+            <div className="text-6xl font-bold text-primary">{score}%</div>
+            <p className="text-lg text-muted-foreground mt-2">Your Score</p>
+          </div>
+        </CardContent>
+        <CardFooter className="justify-center">
           <Button onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
-          <p className="text-xs text-muted-foreground">Redirecting automatically...</p>
         </CardFooter>
       </Card>
     );
