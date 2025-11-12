@@ -184,8 +184,12 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     if (quiz.questions.length > 0 && Object.keys(shuffledOptions).length === 0) {
       const newShuffledOptions: { [key: number]: string[] } = {};
       quiz.questions.forEach((question, index) => {
-        const allOptions = [question.correctAnswer, ...question.options];
-        // Shuffle using Fisher-Yates algorithm for consistent results
+        const optionsSet = new Set(question.options);
+        if (!optionsSet.has(question.correctAnswer)) {
+          optionsSet.add(question.correctAnswer);
+        }
+        const allOptions = Array.from(optionsSet);
+        
         const shuffled = [...allOptions];
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
