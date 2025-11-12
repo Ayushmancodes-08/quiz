@@ -58,7 +58,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     if (result.success && result.data?.isCheating) {
         await supabase
           .from('quiz_attempts')
-          .update({ is_flagged: true })
+          .update({ is_flagged: true } as any)
           .eq('id', attempt.id);
     }
   }, [user, quiz, supabase]);
@@ -143,7 +143,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
           completed_at: new Date().toISOString(),
           violations: violationCount,
           is_flagged: isViolation || violationCount >= 3,
-        });
+        } as any);
 
       if (error) throw error;
       

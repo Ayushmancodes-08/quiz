@@ -119,7 +119,7 @@ export function CreateQuizForm() {
           difficulty: quizToSave.difficulty,
           questions: quizToSave.questions as any,
           created_at: quizToSave.createdAt,
-        })
+        } as any)
         .select()
         .single();
 

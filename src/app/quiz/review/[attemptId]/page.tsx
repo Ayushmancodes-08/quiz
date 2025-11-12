@@ -26,7 +26,6 @@ export default function QuizReviewPage() {
   useEffect(() => {
     async function loadReview() {
       try {
-        // Fetch quiz attempt
         const { data: attemptData, error: attemptError } = await supabase
           .from('quiz_attempts')
           .select('*')
@@ -36,45 +35,42 @@ export default function QuizReviewPage() {
         if (attemptError) throw attemptError;
         if (!attemptData) throw new Error('Quiz attempt not found');
 
-        // Map to QuizAttempt type
         const mappedAttempt: QuizAttempt = {
-          id: attemptData.id,
-          quizId: attemptData.quiz_id,
-          quizTitle: attemptData.quiz_title,
-          userId: attemptData.user_id,
-          userName: attemptData.user_name,
-          studentName: attemptData.student_name,
-          registrationNumber: attemptData.registration_number,
-          authorId: attemptData.author_id,
-          answers: attemptData.answers as any,
-          score: attemptData.score,
-          startedAt: attemptData.started_at,
-          completedAt: attemptData.completed_at,
-          violations: attemptData.violations,
-          isFlagged: attemptData.is_flagged,
+          id: (attemptData as any).id,
+          quizId: (attemptData as any).quiz_id,
+          quizTitle: (attemptData as any).quiz_title,
+          userId: (attemptData as any).user_id,
+          userName: (attemptData as any).user_name,
+          studentName: (attemptData as any).student_name,
+          registrationNumber: (attemptData as any).registration_number,
+          authorId: (attemptData as any).author_id,
+          answers: (attemptData as any).answers,
+          score: (attemptData as any).score,
+          startedAt: (attemptData as any).started_at,
+          completedAt: (attemptData as any).completed_at,
+          violations: (attemptData as any).violations,
+          isFlagged: (attemptData as any).is_flagged,
         };
 
         setAttempt(mappedAttempt);
 
-        // Fetch quiz details
         const { data: quizData, error: quizError } = await supabase
           .from('quizzes')
           .select('*')
-          .eq('id', attemptData.quiz_id)
+          .eq('id', (attemptData as any).quiz_id)
           .single();
 
         if (quizError) throw quizError;
         if (!quizData) throw new Error('Quiz not found');
 
-        // Map to Quiz type
         const mappedQuiz: Quiz = {
-          id: quizData.id,
-          authorId: quizData.author_id,
-          title: quizData.title,
-          topic: quizData.topic,
-          difficulty: quizData.difficulty as 'easy' | 'medium' | 'hard',
-          questions: quizData.questions as any,
-          createdAt: quizData.created_at,
+          id: (quizData as any).id,
+          authorId: (quizData as any).author_id,
+          title: (quizData as any).title,
+          topic: (quizData as any).topic,
+          difficulty: (quizData as any).difficulty as 'easy' | 'medium' | 'hard',
+          questions: (quizData as any).questions,
+          createdAt: (quizData as any).created_at,
         };
 
         setQuiz(mappedQuiz);
