@@ -4,4 +4,4 @@ Disallow: /api/
 Disallow: /dashboard/
 Disallow: /auth/
 
-Sitemap: https://your-domain.vercel.app/sitemap.xml
+Sitemap: https://your-domain.com/sitemap.xml

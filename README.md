@@ -285,17 +285,16 @@ npm run typecheck    # Run TypeScript checks
 
 The app can be deployed to any platform that supports Next.js:
 
-- **Vercel** - Recommended for Next.js apps
-- **Netlify** - Alternative hosting
-- **Railway** - Full-stack deployment
+- **Cloud Platforms** - Any Next.js compatible hosting
 - **Self-hosted** - Docker or VPS
+- **Container Services** - Kubernetes, Docker Swarm
 
 ### Deployment Steps
 
-1. Push code to GitHub
-2. Connect to your hosting platform
-3. Add environment variables
-4. Deploy
+1. Build the application: `npm run build`
+2. Set environment variables
+3. Start production server: `npm start`
+4. Configure reverse proxy (nginx, Apache)
 
 ### Performance Features
 
