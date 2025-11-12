@@ -6,7 +6,6 @@ import { detectAndFlagCheating, type DetectAndFlagCheatingInput } from '@/ai/flo
 
 export async function generateQuizAction(input: GenerateQuizFromTopicInput) {
   try {
-    // Input validation
     if (!input.topic || typeof input.topic !== 'string' || input.topic.trim().length < 3) {
       return { success: false, error: "Topic must be at least 3 characters long." };
     }
@@ -19,7 +18,6 @@ export async function generateQuizAction(input: GenerateQuizFromTopicInput) {
 
     const result = await generateQuizFromTopic(input);
     
-    // Result validation
     if (!result || !result.quiz || !Array.isArray(result.quiz) || result.quiz.length === 0) {
       return { success: false, error: "Generated quiz is invalid or empty." };
     }
@@ -27,7 +25,19 @@ export async function generateQuizAction(input: GenerateQuizFromTopicInput) {
     return { success: true, data: result };
   } catch (error: any) {
     console.error("Error generating quiz:", error);
-    const errorMessage = error?.message || "Failed to generate quiz. Please try again.";
+    
+    let errorMessage = "Failed to generate quiz. Please try again.";
+    
+    if (error?.message?.includes('503') || error?.message?.includes('overloaded')) {
+      errorMessage = "Google AI service is temporarily overloaded. Please wait a moment and try again.";
+    } else if (error?.message?.includes('429') || error?.message?.includes('quota')) {
+      errorMessage = "API quota exceeded. Please try again later or check your API key.";
+    } else if (error?.message?.includes('401') || error?.message?.includes('API key')) {
+      errorMessage = "Invalid API key. Please check your Google AI API key configuration.";
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+    
     return { success: false, error: errorMessage };
   }
 }
