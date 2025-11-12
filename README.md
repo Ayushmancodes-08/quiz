@@ -1,155 +1,328 @@
 # QuizMasterAI
 
-A modern quiz application built with Next.js, Firebase, and Google AI (Genkit) for generating and sharing quizzes.
+AI-powered quiz platform with advanced anti-cheat features and real-time analytics.
 
 ## Features
 
-- 🤖 **AI-Powered Quiz Generation**: Generate quizzes on any topic using Google's Gemini AI
-- 🔗 **Public Quiz Sharing**: Share quizzes with anyone via public links (no login required)
-- 📊 **Results Dashboard**: View quiz attempts, scores, and analytics
-- 🛡️ **Anti-Cheat Protection**: Built-in violation detection and flagging
-- 🔐 **User Authentication**: Email/password and Google Sign-In support
-- 📱 **Responsive Design**: Works on desktop and mobile devices
+### For Teachers/Admins
+- **AI Quiz Generation** - Create quizzes using Google Gemini AI on any topic
+- **Share Quizzes** - Multiple sharing options (link, QR code, email, social media)
+- **Real-time Analytics** - Performance tracking and AI-powered insights
+- **Leaderboard** - Students ranked by score with trophy system
+- **Delete Management** - Remove individual attempts or entire quizzes
+- **Review System** - View detailed student answers and performance
+
+### For Students
+- **Take Quizzes** - Clean, distraction-free interface
+- **Review Answers** - See correct/incorrect answers after completion
+- **Mobile Responsive** - Works seamlessly on all devices
+- **Anti-Cheat Monitoring** - Fair testing environment
+
+### Anti-Cheat System
+- **Browser Lockdown** - Fullscreen mode with keyboard lock
+- **Screenshot Detection** - Blocks all screenshot methods
+- **Tab Switching Detection** - Monitors focus changes
+- **AI Agent Detection** - Identifies automation tools
+- **3-Strike Policy** - Auto-submit after violations
+- **Wake Lock** - Prevents screen sleep during quiz
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router)
+- **Database**: Supabase (PostgreSQL)
+- **AI**: Google Gemini (via Genkit)
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Auth**: Supabase Auth (Email + Google OAuth)
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- Firebase project
-- Google AI API key (for quiz generation)
+- Supabase account ([supabase.com](https://supabase.com))
+- Google AI API key ([makersuite.google.com](https://makersuite.google.com/app/apikey))
 
 ### Installation
 
-1. **Clone the repository**
+1. **Clone and install:**
    ```bash
-   git clone <repository-url>
+   git clone <your-repo-url>
    cd quiz-main
-   ```
-
-2. **Install dependencies**
-   ```bash
    npm install
    ```
 
-3. **Set up environment variables**
+2. **Configure environment variables:**
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. **Edit `.env.local`:**
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   GOOGLE_API_KEY=your_google_ai_api_key
+   ```
+
+4. **Set up Supabase database:**
    
-   Create a `.env.local` file in the root directory. See [SETUP.md](./SETUP.md) for detailed instructions.
+   Go to your Supabase project → SQL Editor and run:
 
-   Required variables:
-   - `NEXT_PUBLIC_FIREBASE_API_KEY`
-   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-   - `GOOGLE_GENAI_API_KEY`
-   - (See SETUP.md for complete list)
+   ```sql
+   -- Enable UUID extension
+   CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-4. **Run the development server**
+   -- Create user_profiles table
+   CREATE TABLE IF NOT EXISTS public.user_profiles (
+       id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+       email TEXT NOT NULL,
+       display_name TEXT NOT NULL,
+       created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+   );
+
+   -- Create quizzes table
+   CREATE TABLE IF NOT EXISTS public.quizzes (
+       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       author_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+       title TEXT NOT NULL,
+       topic TEXT NOT NULL,
+       difficulty TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
+       questions JSONB NOT NULL,
+       created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+   );
+
+   -- Create quiz_attempts table
+   CREATE TABLE IF NOT EXISTS public.quiz_attempts (
+       id UUID PRIMARY KEY,
+       quiz_id UUID NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+       quiz_title TEXT NOT NULL,
+       user_id TEXT NOT NULL,
+       user_name TEXT NOT NULL,
+       student_name TEXT NOT NULL,
+       registration_number TEXT NOT NULL,
+       author_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+       answers JSONB NOT NULL,
+       score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
+       started_at TIMESTAMPTZ NOT NULL,
+       completed_at TIMESTAMPTZ NOT NULL,
+       violations INTEGER NOT NULL CHECK (violations >= 0),
+       is_flagged BOOLEAN NOT NULL DEFAULT FALSE,
+       created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+   );
+
+   -- Create indexes
+   CREATE INDEX IF NOT EXISTS idx_quizzes_author_id ON public.quizzes(author_id);
+   CREATE INDEX IF NOT EXISTS idx_quizzes_created_at ON public.quizzes(created_at DESC);
+   CREATE INDEX IF NOT EXISTS idx_quiz_attempts_author_id ON public.quiz_attempts(author_id);
+   CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user_id ON public.quiz_attempts(user_id);
+   CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_id ON public.quiz_attempts(quiz_id);
+   CREATE INDEX IF NOT EXISTS idx_quiz_attempts_completed_at ON public.quiz_attempts(completed_at DESC);
+
+   -- Enable Row Level Security
+   ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.quizzes ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.quiz_attempts ENABLE ROW LEVEL SECURITY;
+
+   -- User Profiles Policies
+   CREATE POLICY "Users can view own profile" ON public.user_profiles FOR SELECT USING (auth.uid() = id);
+   CREATE POLICY "Users can insert own profile" ON public.user_profiles FOR INSERT WITH CHECK (auth.uid() = id);
+   CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE USING (auth.uid() = id);
+
+   -- Quizzes Policies
+   CREATE POLICY "Anyone can view quizzes by ID" ON public.quizzes FOR SELECT USING (true);
+   CREATE POLICY "Authenticated users can create quizzes" ON public.quizzes FOR INSERT WITH CHECK (auth.uid() = author_id);
+   CREATE POLICY "Authors can update own quizzes" ON public.quizzes FOR UPDATE USING (auth.uid() = author_id);
+   CREATE POLICY "Authors can delete own quizzes" ON public.quizzes FOR DELETE USING (auth.uid() = author_id);
+
+   -- Quiz Attempts Policies
+   CREATE POLICY "Anyone can create quiz attempts" ON public.quiz_attempts FOR INSERT 
+   WITH CHECK (
+       student_name IS NOT NULL AND 
+       LENGTH(student_name) > 0 AND
+       registration_number IS NOT NULL AND 
+       LENGTH(registration_number) > 0 AND
+       score >= 0 AND 
+       score <= 100 AND
+       violations >= 0
+   );
+
+   CREATE POLICY "Users can view own attempts or created quiz attempts" ON public.quiz_attempts FOR SELECT 
+   USING (
+       auth.uid()::text = user_id OR 
+       auth.uid() = author_id
+   );
+
+   CREATE POLICY "Users can update own attempts or authors can update quiz attempts" ON public.quiz_attempts FOR UPDATE 
+   USING (
+       auth.uid()::text = user_id OR 
+       auth.uid() = author_id
+   )
+   WITH CHECK (
+       score >= 0 AND 
+       score <= 100 AND
+       violations >= 0
+   );
+
+   CREATE POLICY "Users can delete own attempts or authors can delete quiz attempts" ON public.quiz_attempts FOR DELETE 
+   USING (
+       auth.uid()::text = user_id OR 
+       auth.uid() = author_id
+   );
+
+   -- Auto-create user profile function
+   CREATE OR REPLACE FUNCTION public.handle_new_user() 
+   RETURNS TRIGGER AS $$
+   BEGIN
+       INSERT INTO public.user_profiles (id, email, display_name, created_at)
+       VALUES (
+           NEW.id,
+           NEW.email,
+           COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email),
+           NOW()
+       );
+       RETURN NEW;
+   END;
+   $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+   -- Trigger for new users
+   DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+   CREATE TRIGGER on_auth_user_created 
+       AFTER INSERT ON auth.users 
+       FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+   ```
+
+5. **Configure Google OAuth (Optional):**
+   - Go to Supabase Dashboard → Authentication → Providers
+   - Enable Google provider
+   - Add your Google OAuth credentials
+
+6. **Start development server:**
    ```bash
    npm run dev
    ```
 
-   The app will be available at `http://localhost:9002`
-
-## Documentation
-
-- [Local Setup Guide](./SETUP.md) - Detailed instructions for local environment setup
-- [Deploy Firestore Rules](./DEPLOY_RULES.md) - Step-by-step guide for deploying security rules
-- [Quick Deploy Reference](./FIREBASE_RULES_QUICK_DEPLOY.md) - Quick reference for deploying rules
-- [Firebase Configuration](./docs/backend.json) - Backend structure documentation
+7. **Open your browser:**
+   ```
+   http://localhost:9002
+   ```
 
 ## Project Structure
 
 ```
-quiz-main/
-├── src/
-│   ├── app/              # Next.js app router pages
-│   ├── components/      # React components
-│   ├── firebase/        # Firebase configuration
-│   ├── ai/              # Genkit AI flows
-│   └── lib/             # Utilities and types
-├── firestore.rules      # Firestore security rules
-└── .env.local           # Environment variables (create this)
+src/
+├── app/                    # Next.js app router pages
+│   ├── auth/               # Authentication pages
+│   ├── dashboard/          # Admin dashboard
+│   ├── quiz/               # Quiz pages
+│   └── layout.tsx          # Root layout
+├── components/
+│   ├── dashboard/          # Admin components
+│   ├── quiz/               # Quiz-taking components
+│   ├── shared/             # Shared components
+│   └── ui/                 # shadcn/ui components
+├── hooks/                  # Custom React hooks
+├── lib/                    # Utilities and types
+└── supabase/               # Supabase client and types
 ```
 
 ## Available Scripts
 
-- `npm run dev` - Start development server (port 9002)
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run genkit:dev` - Start Genkit AI development server
-- `npm run lint` - Run ESLint
-- `npm run typecheck` - Run TypeScript type checking
+```bash
+npm run dev          # Start development server (port 9002)
+npm run build        # Build for production
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run typecheck    # Run TypeScript checks
+```
 
-## Key Features
+## Key Features Explained
 
-### Public Quiz Sharing
+### Leaderboard System
+- Students automatically ranked by score
+- Top 3 get trophy icons (🏆 Gold, 🥈 Silver, 🥉 Bronze)
+- Visual hierarchy with gradient backgrounds
+- Mobile-responsive card layout
 
-- Quizzes are stored in both user collections and a public `/quizzes` collection
-- Anyone with the link can view and take quizzes (no authentication required)
-- Quiz creators can manage their quizzes from the dashboard
+### Anti-Cheat Features
+- **Fullscreen Mode**: Automatically enters fullscreen
+- **Keyboard Lock**: Blocks Alt+Tab, Windows key, etc. (Chrome/Edge)
+- **Screenshot Detection**: Blocks PrintScreen, Win+Shift+S, Cmd+Shift+3/4/5
+- **Tab Detection**: Monitors visibility changes
+- **AI Detection**: Identifies automation tools (Selenium, Puppeteer)
+- **Wake Lock**: Prevents screen sleep (Chrome/Edge)
 
-### Security
+### Share Options
+- Direct link copy
+- QR code generation
+- Email sharing
+- WhatsApp, Facebook, Twitter, LinkedIn
 
-- Firestore security rules enforce proper access control
-- Public quizzes are readable by anyone, but only creators can modify
-- User data is protected and private
+### Analytics Dashboard
+- Real-time performance tracking
+- Score distribution charts
+- Performance trends over time
+- AI-powered summaries
+- Student statistics
 
-### AI Integration
+## Browser Compatibility
 
-- Uses Google's Gemini 2.5 Flash model via Genkit
-- Generates unique quiz questions based on topic, difficulty, and question count
-- Includes AI-powered cheat detection and result summarization
+| Feature | Chrome | Edge | Firefox | Safari |
+|---------|--------|------|---------|--------|
+| Core Features | ✅ | ✅ | ✅ | ✅ |
+| Keyboard Lock | ✅ | ✅ | ⚠️ | ❌ |
+| Wake Lock | ✅ | ✅ | ❌ | ❌ |
 
-## Contributing
+**Recommended**: Chrome or Edge for full anti-cheat features
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+## Environment Variables
 
-## License
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL | Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anonymous key | Yes |
+| `GOOGLE_API_KEY` | Google AI API key for quiz generation | Yes |
 
-[Add your license here]
+## Deployment
+
+### Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Import project in Vercel
+3. Add environment variables
+4. Deploy
+
+### Other Platforms
+
+The app can be deployed to any platform that supports Next.js:
+- Netlify
+- Railway
+- Render
+- Self-hosted
 
 ## Troubleshooting
 
-### Quiz Sharing Not Working
+### Database Connection Issues
+- Verify Supabase URL and keys in `.env.local`
+- Check if tables are created in Supabase
+- Ensure RLS policies are enabled
 
-If quiz links don't work or show permission errors:
+### Quiz Generation Fails
+- Verify Google AI API key is valid
+- Check API quota limits
+- Ensure network connectivity
 
-1. **Deploy Firestore Rules**
-   ```bash
-   npm run deploy:rules
-   ```
-   See [DEPLOY_RULES.md](./DEPLOY_RULES.md) for detailed instructions.
+### Anti-Cheat Not Working
+- Use Chrome or Edge for full features
+- Check browser permissions
+- Ensure HTTPS in production
 
-2. **Check Rules Are Deployed**
-   - Go to Firebase Console > Firestore Database > Rules
-   - Verify rules include public quiz access
+## License
 
-3. **Clear Browser Cache**
-   - Hard refresh (Ctrl+Shift+R or Cmd+Shift+R)
-   - Try incognito/private window
-
-### Quiz Creation Fails
-
-If you see "Permission Denied" when creating quizzes:
-
-1. Ensure you're logged in
-2. Deploy Firestore rules: `npm run deploy:rules`
-3. Check error message for specific guidance
-
-### Student Information Not Saving
-
-- Ensure Firestore rules allow anonymous attempt creation
-- Verify `studentName` and `registrationNumber` are provided
-- Check browser console for errors
-
-### Results Dashboard Empty
-
-- Verify you're viewing attempts for quizzes you created
-- Check that `authorId` matches your user ID
-- Ensure Firestore rules allow admin access
+MIT
 
 ## Support
 
-For issues and questions, please open an issue on GitHub.
+For issues or questions, please open a GitHub issue.
+
+---
+
+**Built with ❤️ using Next.js, Supabase, and Google AI**

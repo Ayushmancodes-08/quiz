@@ -3,7 +3,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-// Simplified violation types - only detect: screenshots, circle to search, browser change, AI agent
 export type ViolationType = 'screenshot' | 'circle_to_search' | 'browser_change' | 'ai_agent';
 
 export interface ViolationRecord {
@@ -27,25 +26,16 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
   const automationCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerViolation = useCallback((type: ViolationType, reason: string, details?: string) => {
-    // Stop processing if already disabled
     if (isDisabledRef.current) return;
 
     const timestamp = Date.now();
-    const record: ViolationRecord = {
-      type,
-      reason,
-      timestamp,
-      details,
-    };
+    const record: ViolationRecord = { type, reason, timestamp, details };
 
-    // Use functional updates to avoid stale closure issues
     setViolationRecords(prev => {
       const updated = [...prev, record];
       
-      // Check if we've reached max violations
       if (updated.length >= maxViolations) {
         isDisabledRef.current = true;
-        // Use setTimeout to avoid calling onViolation during render
         setTimeout(() => {
           onViolation(`Exceeded maximum violations (${maxViolations}).`, updated);
         }, 0);
@@ -57,7 +47,6 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     setViolationCount(prev => {
       const newCount = prev + 1;
       
-      // Use setTimeout to avoid calling toast during render/state update
       setTimeout(() => {
         toast({
           variant: 'destructive',
@@ -277,16 +266,15 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
       // Detect Circle to Search through image search APIs
       // Override fetch to detect image search requests
       const originalFetch = window.fetch;
-      window.fetch = function(...args: any[]) {
-        const url = args[0]?.toString() || '';
-        // Detect Google Lens/Circle to Search API calls
+      window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
+        const url = input.toString();
         if (url.includes('lens.google.com') || 
             url.includes('google.com/searchbyimage') ||
             url.includes('reverse-image-search') ||
             (url.includes('google.com') && url.includes('image'))) {
           triggerViolation('circle_to_search', 'Circle to Search Detected', 'Image search detected (Circle to Search).');
         }
-        return originalFetch.apply(this, args);
+        return originalFetch.call(this, input, init);
       };
 
       return () => {
@@ -311,13 +299,72 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
         detectAutomation();
       }, 5000); // Check every 5 seconds
 
-      // Enter fullscreen (but don't trigger violation on failure)
-      document.documentElement.requestFullscreen().catch(err => {
-        console.warn(`Error attempting to enable fullscreen mode: ${err.message} (${err.name})`);
-        // Don't trigger violation for fullscreen failure - it's not a cheating attempt
-      });
+      let wakeLock: any = null;
+
+      // 1. Enter fullscreen mode
+      const enterFullscreen = async () => {
+        try {
+          await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+          console.log('Fullscreen mode activated');
+        } catch (err: any) {
+          console.warn(`Fullscreen error: ${err.message}`);
+        }
+      };
+
+      // 2. Request keyboard lock (prevents Alt+Tab, Windows key, etc.)
+      const lockKeyboard = async () => {
+        try {
+          if ('keyboard' in navigator && 'lock' in (navigator as any).keyboard) {
+            await (navigator as any).keyboard.lock([
+              'Escape',
+              'MetaLeft', 'MetaRight', // Windows/Command key
+              'AltLeft', 'AltRight',
+              'Tab',
+              'ContextMenu',
+            ]);
+            console.log('Keyboard locked');
+          }
+        } catch (err: any) {
+          console.warn(`Keyboard lock error: ${err.message}`);
+        }
+      };
+
+      // 3. Request wake lock (prevents screen from sleeping)
+      const requestWakeLock = async () => {
+        try {
+          if ('wakeLock' in navigator) {
+            wakeLock = await (navigator as any).wakeLock.request('screen');
+            console.log('Wake lock activated');
+            
+            wakeLock.addEventListener('release', () => {
+              console.log('Wake lock released');
+            });
+          }
+        } catch (err: any) {
+          console.warn(`Wake lock error: ${err.message}`);
+        }
+      };
+
+      // 4. Monitor fullscreen exit attempts
+      const handleFullscreenChange = () => {
+        if (!document.fullscreenElement && !isDisabledRef.current) {
+          // User exited fullscreen - try to re-enter
+          setTimeout(() => {
+            if (!isDisabledRef.current) {
+              enterFullscreen();
+              triggerViolation('browser_change', 'Fullscreen Exit Attempt', 'You must stay in fullscreen mode.');
+            }
+          }, 100);
+        }
+      };
+
+      // Initialize all locks
+      enterFullscreen();
+      lockKeyboard();
+      requestWakeLock();
 
       // Add event listeners
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
       document.addEventListener('visibilitychange', handleVisibilityChange);
       document.addEventListener('contextmenu', handleContextMenu);
       window.addEventListener('keydown', handleKeyDown);
@@ -329,18 +376,64 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
       document.body.addEventListener('dragstart', (e) => e.preventDefault());
       document.body.addEventListener('drop', (e) => e.preventDefault());
 
+      // Block common exit shortcuts
+      const blockExitShortcuts = (e: KeyboardEvent) => {
+        // Block Alt+F4 (Windows close)
+        if (e.altKey && e.key === 'F4') {
+          e.preventDefault();
+          triggerViolation('browser_change', 'Exit Attempt', 'Alt+F4 is disabled.');
+        }
+        // Block Ctrl+W (close tab)
+        if (e.ctrlKey && e.key === 'w') {
+          e.preventDefault();
+          triggerViolation('browser_change', 'Exit Attempt', 'Ctrl+W is disabled.');
+        }
+        // Block Ctrl+Q (quit browser)
+        if (e.ctrlKey && e.key === 'q') {
+          e.preventDefault();
+          triggerViolation('browser_change', 'Exit Attempt', 'Ctrl+Q is disabled.');
+        }
+        // Block F11 (fullscreen toggle)
+        if (e.key === 'F11') {
+          e.preventDefault();
+        }
+      };
+      window.addEventListener('keydown', blockExitShortcuts);
+
+      // Warn before leaving page
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        e.returnValue = 'Are you sure you want to leave? Your quiz progress may be lost.';
+        return e.returnValue;
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
       // Cleanup
       return () => {
         if (automationCheckIntervalRef.current) {
           clearInterval(automationCheckIntervalRef.current);
           automationCheckIntervalRef.current = null;
         }
+        
+        // Release all locks
         if (document.fullscreenElement) {
-          document.exitFullscreen();
+          document.exitFullscreen().catch(() => {});
         }
+        if ('keyboard' in navigator && 'unlock' in (navigator as any).keyboard) {
+          (navigator as any).keyboard.unlock();
+        }
+        if (wakeLock) {
+          wakeLock.release().catch(() => {});
+        }
+
+        // Remove event listeners
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         document.removeEventListener('contextmenu', handleContextMenu);
         window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keydown', blockExitShortcuts);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        
         document.body.style.userSelect = 'auto';
         isDisabledRef.current = false;
       };

@@ -12,8 +12,7 @@ import { Input } from '@/components/ui/input';
 import { AlertCircle, CheckCircle, Loader2, ShieldOff, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { WithId, useUser, useFirestore, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { WithId, useUser, useSupabaseClient } from '@/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { detectAndFlagCheatingAction } from '@/lib/actions';
 
@@ -43,7 +42,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useUser();
-  const firestore = useFirestore();
+  const supabase = useSupabaseClient();
 
   // Use ref to store calculateAndSaveAttempt to avoid hoisting issues
   const calculateAndSaveAttemptRef = useRef<((isViolation?: boolean, violationRecords?: any[]) => Promise<void>) | null>(null);
@@ -52,20 +51,17 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     if (!user) return;
     const result = await detectAndFlagCheatingAction({
        quizAttemptDetails: `Score: ${attempt.score}%, Violations: ${attempt.violations}`,
-       userDetails: `User ID: ${user.uid}, Name: ${user.displayName || attempt.studentName}`,
+       userDetails: `User ID: ${user.id}, Name: ${user.user_metadata?.display_name || attempt.studentName}`,
        quizDetails: `Quiz: ${quiz.title}, Topic: ${quiz.topic}, Difficulty: ${quiz.difficulty}`,
     });
 
-    if (result.success && result.data?.isCheating && firestore) {
-        const attemptRef = doc(firestore, 'quiz_attempts', attempt.id);
-        updateDocumentNonBlocking(attemptRef, { isFlagged: true });
-        
-        if (user) {
-          const userAttemptRef = doc(firestore, `users/${user.uid}/quiz_attempts`, attempt.id);
-          updateDocumentNonBlocking(userAttemptRef, { isFlagged: true });
-        }
+    if (result.success && result.data?.isCheating) {
+        await supabase
+          .from('quiz_attempts')
+          .update({ is_flagged: true })
+          .eq('id', attempt.id);
     }
-  }, [user, quiz, firestore]);
+  }, [user, quiz, supabase]);
 
   const handleViolation = useCallback(
     (reason: string, violationRecords?: any[]) => {
@@ -128,7 +124,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   });
 
   const calculateAndSaveAttempt = useCallback(async (isViolation = false, violationRecords?: any[]) => {
-    if (!firestore || !startTime) {
+    if (!startTime) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not submit quiz. Session data missing.' });
       setQuizState((current) => current === QuizState.InProgress ? QuizState.InProgress : current);
       return;
@@ -155,8 +151,8 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     setScore(finalScore);
 
     const attemptId = uuidv4();
-    const userId = user?.uid || 'anonymous';
-    const userName = user?.displayName || studentName;
+    const userId = user?.id || 'anonymous';
+    const userName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || studentName;
     
     const attempt: QuizAttempt = {
       id: attemptId,
@@ -176,16 +172,27 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     };
 
     try {
-      // Save to Firebase (for backward compatibility and user history)
-      const attemptsRef = doc(firestore, "quiz_attempts", attemptId);
-      await setDocumentNonBlocking(attemptsRef, attempt, {});
+      // Save to Supabase
+      const { error } = await supabase
+        .from('quiz_attempts')
+        .insert({
+          id: attemptId,
+          quiz_id: quiz.id,
+          quiz_title: quiz.title,
+          user_id: userId,
+          user_name: userName,
+          student_name: studentName.trim(),
+          registration_number: registrationNumber.trim(),
+          author_id: quiz.authorId,
+          answers: answers as any,
+          score: finalScore,
+          started_at: new Date(startTime).toISOString(),
+          completed_at: new Date().toISOString(),
+          violations: violationCount,
+          is_flagged: isViolation || violationCount >= 3,
+        });
 
-      // Only save to user collection if authenticated
-      if (user) {
-        const userAttemptRef = doc(firestore, `users/${user.uid}/quiz_attempts`, attemptId);
-        await setDocumentNonBlocking(userAttemptRef, attempt, {});
-      }
-
+      if (error) throw error;
       
       // Run AI cheat detection in the background (only for authenticated users)
       if (user) {
@@ -207,7 +214,7 @@ export function QuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [user, firestore, startTime, quiz, answers, violationCount, studentName, registrationNumber, runAiCheatDetection, toast]);
+  }, [user, supabase, startTime, quiz, answers, violationCount, studentName, registrationNumber, runAiCheatDetection, toast]);
 
   // Update ref when calculateAndSaveAttempt changes
   useEffect(() => {

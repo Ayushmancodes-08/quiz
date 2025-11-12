@@ -1,24 +1,59 @@
 'use client';
 
-import { useDoc, useFirestore, useMemoFirebase, WithId } from '@/firebase';
-import { QuizTaker } from '@/components/quiz/quiz-taker';
-import { notFound, useParams } from 'next/navigation';
-import { doc } from 'firebase/firestore';
+import { useSupabaseClient, WithId } from '@/supabase';
+import { MobileQuizTaker } from '@/components/quiz/mobile-quiz-taker';
+import { useParams } from 'next/navigation';
 import type { Quiz } from '@/lib/types';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useEffect, useState } from 'react';
+import type { Database } from '@/supabase/types';
+
+type QuizRow = Database['public']['Tables']['quizzes']['Row'];
+
+function mapQuizRowToQuiz(row: QuizRow): WithId<Quiz> {
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    title: row.title,
+    topic: row.topic,
+    difficulty: row.difficulty as 'easy' | 'medium' | 'hard',
+    questions: row.questions as any,
+    createdAt: row.created_at,
+  };
+}
 
 export default function QuizPage() {
   const { id: quizId } = useParams();
-  const firestore = useFirestore();
+  const supabase = useSupabaseClient();
+  const [quiz, setQuiz] = useState<WithId<Quiz> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  // Load from public /quizzes collection - works for anyone with the link
-  const quizDocRef = useMemoFirebase(() => {
-    if (!firestore || !quizId) return null;
-    return doc(firestore, `quizzes/${quizId as string}`);
-  }, [firestore, quizId]);
+  useEffect(() => {
+    if (!quizId) return;
 
-  const { data: quiz, isLoading, error } = useDoc<Quiz>(quizDocRef);
+    const fetchQuiz = async () => {
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('id', quizId as string)
+          .single();
+
+        if (fetchError) throw fetchError;
+        if (data) {
+          setQuiz(mapQuizRowToQuiz(data));
+        }
+      } catch (err) {
+        setError(err as Error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchQuiz();
+  }, [quizId, supabase]);
 
   if (isLoading) {
     return (
@@ -47,8 +82,6 @@ export default function QuizPage() {
 
   // The quiz object from useDoc is already combined with its ID.
   return (
-    <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
-      <QuizTaker quiz={quiz as WithId<Quiz>} />
-    </div>
+    <MobileQuizTaker quiz={quiz as WithId<Quiz>} />
   );
 }

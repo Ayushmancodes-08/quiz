@@ -18,8 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Question, Quiz } from '@/lib/types';
 import { Loader2, Save, Wand2 } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
-import { useFirestore, useUser } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { useSupabaseClient, useUser } from '@/supabase';
 
 const formSchema = z.object({
   topic: z.string().min(3, 'Topic must be at least 3 characters long.'),
@@ -33,7 +32,7 @@ export function CreateQuizForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [generatedQuiz, setGeneratedQuiz] = useState<Omit<Quiz, 'authorId' | 'createdAt'> | null>(null);
   const { toast } = useToast();
-  const firestore = useFirestore();
+  const supabase = useSupabaseClient();
   const { user } = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -81,7 +80,7 @@ export function CreateQuizForm() {
   }
 
   async function handleSaveQuiz() {
-    if (!generatedQuiz || !user || !firestore) {
+    if (!generatedQuiz || !user) {
       toast({
         variant: 'destructive',
         title: 'Save Failed',
@@ -94,13 +93,13 @@ export function CreateQuizForm() {
     
     const quizToSave: Quiz = {
       ...generatedQuiz,
-      authorId: user.uid,
+      authorId: user.id,
       createdAt: new Date().toISOString(),
     };
 
     // Validate authorId is set correctly
-    if (!quizToSave.authorId || quizToSave.authorId !== user.uid) {
-      console.error('Author ID validation failed:', { authorId: quizToSave.authorId, userId: user.uid });
+    if (!quizToSave.authorId || quizToSave.authorId !== user.id) {
+      console.error('Author ID validation failed:', { authorId: quizToSave.authorId, userId: user.id });
       toast({
         variant: 'destructive',
         title: 'Validation Error',
@@ -111,42 +110,22 @@ export function CreateQuizForm() {
     }
 
     try {
-      // Generate a document ID that will be used in both collections
-      const quizId = doc(collection(firestore, 'quizzes')).id;
-      console.log('Saving quiz with ID:', quizId);
+      const { data, error } = await supabase
+        .from('quizzes')
+        .insert({
+          author_id: quizToSave.authorId,
+          title: quizToSave.title,
+          topic: quizToSave.topic,
+          difficulty: quizToSave.difficulty,
+          questions: quizToSave.questions as any,
+          created_at: quizToSave.createdAt,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
       
-      // Save to user's personal collection (using the same document ID)
-      const userQuizRef = doc(firestore, `users/${user.uid}/quizzes/${quizId}`);
-      try {
-        await setDoc(userQuizRef, { ...quizToSave, id: quizId });
-        console.log('Saved to user collection:', userQuizRef.path);
-      } catch (userError: any) {
-        console.error('Error saving to user collection:', userError);
-        if (userError.code === 'permission-denied') {
-          throw new Error('Permission denied: Unable to save to your personal collection. Please check Firestore rules.');
-        }
-        throw userError;
-      }
-      
-      // Save to public collection for sharing (using the same document ID)
-      const publicQuizRef = doc(firestore, `quizzes/${quizId}`);
-      try {
-        await setDoc(publicQuizRef, { ...quizToSave, id: quizId });
-        console.log('Saved to public collection:', publicQuizRef.path);
-      } catch (publicError: any) {
-        console.error('Error saving to public collection:', publicError);
-        // If public save fails, try to clean up user collection
-        try {
-          await deleteDoc(userQuizRef);
-        } catch (cleanupError) {
-          console.error('Error cleaning up user collection:', cleanupError);
-        }
-        
-        if (publicError.code === 'permission-denied') {
-          throw new Error('Permission denied: Unable to save to public collection. Please deploy Firestore rules using: npm run deploy:rules');
-        }
-        throw publicError;
-      }
+      console.log('Quiz saved successfully:', data);
       
       toast({
         title: 'Quiz Saved!',
@@ -156,26 +135,48 @@ export function CreateQuizForm() {
       form.reset();
     } catch (error: any) {
       console.error('Error saving quiz:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        full: error
+      });
+      
       const errorMessage = error.message || 'Could not save the quiz to the database.';
       
-      // Provide specific error messages
-      if (error.code === 'permission-denied') {
+      // Check for table not found error
+      if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
         toast({
           variant: 'destructive',
-          title: 'Permission Denied',
-          description: 'Unable to save quiz. Please ensure Firestore rules are deployed. Run: npm run deploy:rules',
+          title: 'Database Not Set Up',
+          description: '⚠️ Tables not created! Run migrations in Supabase SQL Editor. See README_FIRST.md',
         });
-      } else if (error.code === 'unavailable') {
+      } else if (error.code === '42P01') {
+        // PostgreSQL error code for undefined table
         toast({
           variant: 'destructive',
-          title: 'Connection Error',
-          description: 'Unable to connect to Firebase. Please check your internet connection and try again.',
+          title: 'Database Not Set Up',
+          description: '⚠️ The "quizzes" table does not exist. Run migrations in Supabase SQL Editor.',
+        });
+      } else if (error.code === 'PGRST116') {
+        // PostgREST error for table not found
+        toast({
+          variant: 'destructive',
+          title: 'Database Not Set Up',
+          description: '⚠️ Tables not found in schema cache. Run migrations: See FIX_ERRORS_NOW.md',
+        });
+      } else if (error.message?.includes('JWT')) {
+        toast({
+          variant: 'destructive',
+          title: 'Authentication Error',
+          description: 'Please sign out and sign in again.',
         });
       } else {
         toast({
           variant: 'destructive',
           title: 'Save Error',
-          description: errorMessage,
+          description: `${errorMessage} (Check console for details)`,
         });
       }
     } finally {

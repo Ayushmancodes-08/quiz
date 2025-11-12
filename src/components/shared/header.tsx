@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useAuth } from '@/hooks/use-auth';
+import { useSupabaseAuth } from '@/hooks/use-supabase-auth';
 import Logo from './logo';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,7 +16,7 @@ import {
 import { LayoutDashboard, LogOut } from 'lucide-react';
 
 export default function Header() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading } = useSupabaseAuth();
 
   const getInitials = (name?: string | null) => {
     if (!name) return '';
@@ -27,29 +27,32 @@ export default function Header() {
     return name[0];
   }
 
+  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User';
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
+      <div className="container flex h-14 md:h-16 items-center px-4">
         <Logo />
-        <div className="flex flex-1 items-center justify-end space-x-4">
+        <div className="flex flex-1 items-center justify-end space-x-2 md:space-x-4">
           <nav className="flex items-center space-x-2">
             {loading ? (
-              <div className="h-10 w-20 animate-pulse rounded-md bg-muted"></div>
+              <div className="h-8 md:h-10 w-16 md:w-20 animate-pulse rounded-md bg-muted"></div>
             ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={`https://api.dicebear.com/8.x/bottts-neutral/svg?seed=${user.email}`} alt={user.displayName || 'User'} />
-                      <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+                  <Button variant="ghost" className="relative h-8 w-8 md:h-9 md:w-9 rounded-full">
+                    <Avatar className="h-8 w-8 md:h-9 md:w-9">
+                      <AvatarImage src={avatarUrl || undefined} alt={displayName} />
+                      <AvatarFallback className="text-xs md:text-sm">{getInitials(displayName)}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
+                      <p className="text-sm font-medium leading-none truncate">{displayName}</p>
+                      <p className="text-xs leading-none text-muted-foreground truncate">
                         {user.email}
                       </p>
                     </div>
@@ -69,7 +72,7 @@ export default function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild>
+              <Button asChild size="sm" className="h-9 md:h-10">
                 <Link href="/auth">Sign In</Link>
               </Button>
             )}

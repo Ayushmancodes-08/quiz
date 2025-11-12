@@ -1,10 +1,10 @@
 "use client";
 
-import { useAuth } from "@/hooks/use-auth";
+import { useSupabaseAuth } from "@/hooks/use-supabase-auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { useUser } from "@/firebase";
+import { useUser } from "@/supabase";
 
 export default function DashboardLayout({
   children,

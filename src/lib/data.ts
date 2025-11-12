@@ -1,7 +1,7 @@
 import type { Quiz, QuizAttempt } from './types';
 
 // This data is now only used for fallback or initial structure reference.
-// The application primarily uses real-time data from Firestore.
+// The application primarily uses real-time data from Supabase.
 
 export const MOCK_QUIZZES: Quiz[] = [
   {

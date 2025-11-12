@@ -11,18 +11,18 @@ import { QuizBreakdown } from './quiz-breakdown';
 import { StudentsByQuiz } from './students-by-quiz';
 import { summarizeResultsAction } from '@/lib/actions';
 import { Loader2, TriangleAlert } from 'lucide-react';
-import { useUser, WithId } from '@/firebase';
+import { useUser, WithId } from '@/supabase';
 import type { QuizAttempt } from '@/lib/types';
-import { useFirebaseQuizAttempts } from '@/hooks/use-firebase-quiz-attempts';
+import { useSupabaseQuizAttempts } from '@/hooks/use-supabase-quiz-attempts';
 
 export function ResultsDashboard() {
   const [summary, setSummary] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(true);
   const { user } = useUser();
 
-  // Use Firebase for quiz attempts (real-time updates with Firestore)
-  const { attempts, isLoading: areAttemptsLoading, error: queryError } = useFirebaseQuizAttempts(
-    user?.uid || null
+  // Use Supabase for quiz attempts (real-time updates)
+  const { attempts, isLoading: areAttemptsLoading, error: queryError } = useSupabaseQuizAttempts(
+    user?.id || null
   );
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function ResultsDashboard() {
       );
 
       const response = await summarizeResultsAction({
-        quizName: 'All Quizzes', // We can specify this, but the data contains individual quiz titles.
+        quizName: 'All Quizzes',
         results: resultsJson,
       });
 
@@ -55,11 +55,10 @@ export function ResultsDashboard() {
 
   const recentAttempts = (attempts as WithId<QuizAttempt>[]) || [];
   
-  // Show error message if there's a permission error
   if (queryError) {
     const isPermissionError = queryError.message?.includes('permission') || 
                              queryError.message?.includes('Permission') ||
-                             queryError.code === 'permission-denied';
+                             (queryError as any).code === 'permission-denied';
     
     return (
       <Card>
@@ -70,17 +69,17 @@ export function ResultsDashboard() {
           <div className="space-y-4">
             <p className="text-muted-foreground">
               {isPermissionError 
-                ? "Unable to load quiz attempts due to permission restrictions. Please ensure Firestore security rules are deployed."
+                ? "Unable to load quiz attempts due to permission restrictions. Please check your Supabase RLS policies."
                 : `Error loading quiz attempts: ${queryError.message}`}
             </p>
             {isPermissionError && (
               <div className="rounded-lg bg-muted p-4 space-y-2">
                 <p className="font-semibold">To fix this issue:</p>
                 <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                  <li>Deploy the updated Firestore security rules to your Firebase project</li>
-                  <li>See <code className="bg-background px-1 rounded">FIREBASE_DEPLOYMENT.md</code> for instructions</li>
+                  <li>Verify your Supabase database is set up correctly</li>
+                  <li>Check that Row Level Security policies are applied</li>
                   <li>Ensure you're authenticated with a valid user account</li>
-                  <li>Verify the rules allow list operations on quiz_attempts for authenticated users</li>
+                  <li>See <code className="bg-background px-1 rounded">SUPABASE_SETUP.md</code> for troubleshooting</li>
                 </ol>
               </div>
             )}
