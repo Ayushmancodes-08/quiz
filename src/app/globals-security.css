@@ -1,0 +1,73 @@
+/* Security-focused CSS to prevent screenshots and screen recording */
+
+/* Prevent text selection globally on protected pages */
+.security-protected {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Prevent drag and drop */
+.security-protected * {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
+/* Prevent image context menu on mobile */
+.security-protected img {
+  pointer-events: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Add subtle watermark effect */
+.security-watermark::before {
+  content: attr(data-watermark);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  font-size: 5rem;
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 9999;
+  white-space: nowrap;
+  color: #000;
+}
+
+/* Prevent screenshot via CSS (Android WebView) */
+@media screen {
+  .security-protected {
+    -webkit-app-region: no-drag;
+  }
+}
+
+/* Mobile-specific security */
+@media (max-width: 768px) {
+  .security-protected {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+}
+
+/* Prevent print screen */
+@media print {
+  .security-protected {
+    display: none !important;
+  }
+  
+  body::before {
+    content: "This content cannot be printed for security reasons.";
+    display: block;
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.5rem;
+  }
+}
