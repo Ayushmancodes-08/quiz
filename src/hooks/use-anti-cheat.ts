@@ -120,9 +120,45 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     });
   }, [toast]);
 
-  // 1. Detect browser/tab changes - COUNT AS FLAG, NOT VIOLATION
+  // Detect if device is mobile
+  const isMobile = useRef(false);
+  const lastVisibilityChange = useRef<number>(0);
+  const visibilityChangeCount = useRef<number>(0);
+
+  useEffect(() => {
+    // Detect mobile device
+    isMobile.current = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      ('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0);
+  }, []);
+
+  // 1. Detect browser/tab changes - MOBILE-FRIENDLY with debouncing
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'hidden' && !isDisabledRef.current) {
+      const now = Date.now();
+      const timeSinceLastChange = now - lastVisibilityChange.current;
+      
+      // On mobile, ignore rapid visibility changes (< 2 seconds)
+      // These are usually from keyboard, notifications, or system UI
+      if (isMobile.current && timeSinceLastChange < 2000) {
+        console.log('Ignoring rapid visibility change on mobile');
+        return;
+      }
+      
+      // Reset count if more than 10 seconds since last change
+      if (timeSinceLastChange > 10000) {
+        visibilityChangeCount.current = 0;
+      }
+      
+      visibilityChangeCount.current++;
+      lastVisibilityChange.current = now;
+      
+      // On mobile, only flag after 2 visibility changes (to avoid false positives)
+      if (isMobile.current && visibilityChangeCount.current < 2) {
+        console.log('First visibility change on mobile - not flagging yet');
+        return;
+      }
+      
       // Tab switch is a flag, not immediate violation
       triggerFlag('tab_switch', 'Tab Switch Detected');
     }
@@ -499,15 +535,23 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     setViolationRecords([]);
 
     // Run automation detection immediately and periodically
+    // On mobile, check less frequently to avoid performance issues
     detectAutomation();
+    const checkInterval = isMobile.current ? 15000 : 5000; // 15s on mobile, 5s on desktop
     automationCheckIntervalRef.current = setInterval(() => {
       detectAutomation();
-    }, 5000); // Check every 5 seconds
+    }, checkInterval);
 
     let wakeLock: any = null;
 
-    // 1. Enter fullscreen mode
+    // 1. Enter fullscreen mode (DISABLED ON MOBILE)
     const enterFullscreen = async () => {
+      // Skip fullscreen on mobile - it causes issues
+      if (isMobile.current) {
+        console.log('Skipping fullscreen on mobile device');
+        return;
+      }
+      
       try {
         await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
         console.log('Fullscreen mode activated');
@@ -516,8 +560,14 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
       }
     };
 
-    // 2. Request keyboard lock (prevents Alt+Tab, Windows key, etc.)
+    // 2. Request keyboard lock (DESKTOP ONLY)
     const lockKeyboard = async () => {
+      // Skip keyboard lock on mobile
+      if (isMobile.current) {
+        console.log('Skipping keyboard lock on mobile device');
+        return;
+      }
+      
       try {
         if ('keyboard' in navigator && 'lock' in (navigator as any).keyboard) {
           await (navigator as any).keyboard.lock([
@@ -550,8 +600,11 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
       }
     };
 
-    // 4. Monitor fullscreen exit attempts
+    // 4. Monitor fullscreen exit attempts (DESKTOP ONLY)
     const handleFullscreenChange = () => {
+      // Skip fullscreen monitoring on mobile
+      if (isMobile.current) return;
+      
       if (!document.fullscreenElement && !isDisabledRef.current) {
         // User exited fullscreen - count as flag
         setTimeout(() => {
@@ -563,10 +616,12 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
       }
     };
 
-    // Initialize all locks
-    enterFullscreen();
-    lockKeyboard();
-    requestWakeLock();
+    // Initialize locks (mobile-aware)
+    if (!isMobile.current) {
+      enterFullscreen();
+      lockKeyboard();
+    }
+    requestWakeLock(); // Wake lock works on mobile
 
     // Add event listeners
     document.addEventListener('fullscreenchange', handleFullscreenChange);
