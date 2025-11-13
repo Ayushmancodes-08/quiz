@@ -3,6 +3,7 @@
 import { generateQuizFromTopic, type GenerateQuizFromTopicInput } from '@/ai/flows/generate-quiz-from-topic';
 import { summarizeQuizResults, type SummarizeQuizResultsInput } from '@/ai/flows/summarize-quiz-results';
 import { detectAndFlagCheating, type DetectAndFlagCheatingInput } from '@/ai/flows/detect-and-flag-cheating';
+import { executeWithKeyRotation, getApiKeyManager } from '@/lib/api-key-manager';
 
 export async function generateQuizAction(input: GenerateQuizFromTopicInput) {
   try {
@@ -16,7 +17,12 @@ export async function generateQuizAction(input: GenerateQuizFromTopicInput) {
       return { success: false, error: "Number of questions must be between 1 and 10." };
     }
 
-    const result = await generateQuizFromTopic(input);
+    // Use key rotation for automatic failover
+    const result = await executeWithKeyRotation(async (apiKey) => {
+      // Set the API key for this request
+      process.env.GOOGLE_API_KEY = apiKey;
+      return await generateQuizFromTopic(input);
+    });
     
     if (!result || !result.quiz || !Array.isArray(result.quiz) || result.quiz.length === 0) {
       return { success: false, error: "Generated quiz is invalid or empty." };
@@ -28,10 +34,16 @@ export async function generateQuizAction(input: GenerateQuizFromTopicInput) {
     
     let errorMessage = "Failed to generate quiz. Please try again.";
     
+    const manager = getApiKeyManager();
+    const availableKeys = manager.getAvailableKeysCount();
+    const totalKeys = manager.getTotalKeys();
+    
     if (error?.message?.includes('503') || error?.message?.includes('overloaded')) {
-      errorMessage = "Google AI service is temporarily overloaded. Please wait a moment and try again.";
+      errorMessage = `Google AI service is temporarily overloaded. Tried ${totalKeys} API key(s). Please wait a moment and try again.`;
     } else if (error?.message?.includes('429') || error?.message?.includes('quota')) {
-      errorMessage = "API quota exceeded. Please try again later or check your API key.";
+      errorMessage = `API quota exceeded on all ${totalKeys} key(s). Please try again later.`;
+    } else if (error?.message?.includes('No available API keys')) {
+      errorMessage = `All ${totalKeys} API key(s) are currently rate-limited. Please wait a few minutes and try again.`;
     } else if (error?.message?.includes('401') || error?.message?.includes('API key')) {
       errorMessage = "Invalid API key. Please check your Google AI API key configuration.";
     } else if (error?.message) {
@@ -49,7 +61,11 @@ export async function summarizeResultsAction(input: SummarizeQuizResultsInput) {
             return { success: false, error: "Invalid input provided." };
         }
 
-        const result = await summarizeQuizResults(input);
+        // Use key rotation for automatic failover
+        const result = await executeWithKeyRotation(async (apiKey) => {
+            process.env.GOOGLE_API_KEY = apiKey;
+            return await summarizeQuizResults(input);
+        });
         
         // Result validation
         if (!result) {
@@ -74,7 +90,11 @@ export async function detectAndFlagCheatingAction(input: DetectAndFlagCheatingIn
             return { success: false, error: "Missing required input fields." };
         }
 
-        const result = await detectAndFlagCheating(input);
+        // Use key rotation for automatic failover
+        const result = await executeWithKeyRotation(async (apiKey) => {
+            process.env.GOOGLE_API_KEY = apiKey;
+            return await detectAndFlagCheating(input);
+        });
         
         // Result validation
         if (!result || typeof result.isCheating !== 'boolean') {
