@@ -21,6 +21,11 @@ export default {
         headline: ['"Space Grotesk"', 'sans-serif'],
       },
       colors: {
+        // Custom professional blue palette
+        'space-cadet': '#1E2E4F',
+        'yinmn-blue': '#31487A',
+        'jordy-blue': '#8FB3E2',
+        
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

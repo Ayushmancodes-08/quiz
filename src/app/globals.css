@@ -4,35 +4,55 @@
 
 @layer base {
   :root {
-    --background: 220 15% 15%; /* Softer, muted dark slate */
-    --foreground: 210 30% 90%;
-
-    --card: 220 15% 20%;
-    --card-foreground: 210 30% 90%;
-
-    --popover: 220 15% 15%;
-    --popover-foreground: 210 30% 90%;
-
-    --primary: 190 70% 50%; /* Calming teal */
-    --primary-foreground: 190 70% 5%;
-
-    --secondary: 240 40% 65%; /* Soft lavender */
-    --secondary-foreground: 240 40% 98%;
-
-    --muted: 220 15% 25%;
-    --muted-foreground: 210 30% 65%;
-
-    --accent: 240 40% 65%; /* Soft lavender */
-    --accent-foreground: 240 40% 98%;
+    /* Professional Light Mode Theme */
+    /* Using: Space Cadet (#1E2E4F), YinMn Blue (#31487A), Jordy Blue (#8FB3E2) */
     
-    --destructive: 0 70% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --background: 210 40% 98%; /* Very light blue-white */
+    --foreground: 215 30% 20%; /* Dark blue-gray for text */
 
-    --border: 220 15% 30%;
-    --input: 220 15% 30%;
-    --ring: 190 70% 50%;
+    --card: 0 0% 100%; /* Pure white cards */
+    --card-foreground: 215 30% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 30% 20%;
+
+    --primary: 218 44% 29%; /* YinMn Blue #31487A */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 45% 20%; /* Space Cadet #1E2E4F */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 40% 96%; /* Very light blue-gray */
+    --muted-foreground: 215 20% 45%;
+
+    --accent: 213 73% 72%; /* Jordy Blue #8FB3E2 */
+    --accent-foreground: 215 30% 20%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 213 30% 88%; /* Light blue-gray border */
+    --input: 213 30% 88%;
+    --ring: 218 44% 29%; /* YinMn Blue */
 
     --radius: 0.5rem;
+    
+    /* Chart colors using the blue palette */
+    --chart-1: 218 44% 29%; /* YinMn Blue */
+    --chart-2: 213 73% 72%; /* Jordy Blue */
+    --chart-3: 215 45% 20%; /* Space Cadet */
+    --chart-4: 213 60% 55%; /* Mid blue */
+    --chart-5: 210 50% 85%; /* Light blue */
+    
+    /* Sidebar colors */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 30% 20%;
+    --sidebar-primary: 218 44% 29%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 215 30% 20%;
+    --sidebar-border: 213 30% 88%;
+    --sidebar-ring: 218 44% 29%;
   }
 }
 
@@ -42,26 +62,60 @@
   }
   body {
     @apply bg-background text-foreground font-body;
+    /* Subtle professional grid pattern */
     background-image:
-      radial-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px),
-      linear-gradient(hsl(var(--primary) / 0.03) 1px, transparent 1px),
-      linear-gradient(to right, hsl(var(--primary) / 0.03) 1px, transparent 1px);
+      radial-gradient(hsl(var(--primary) / 0.03) 1px, transparent 1px),
+      linear-gradient(hsl(var(--primary) / 0.02) 1px, transparent 1px),
+      linear-gradient(to right, hsl(var(--primary) / 0.02) 1px, transparent 1px);
     background-size: 100px 100px, 50px 50px, 50px 50px;
-    color-scheme: dark;
+    color-scheme: light;
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Professional shadows */
+  .shadow-professional {
+    box-shadow: 0 2px 8px rgba(49, 72, 122, 0.08), 0 1px 3px rgba(49, 72, 122, 0.06);
+  }
+  
+  .shadow-professional-lg {
+    box-shadow: 0 10px 25px rgba(49, 72, 122, 0.1), 0 4px 10px rgba(49, 72, 122, 0.06);
   }
 }
 
 @layer utilities {
-  .text-glow-primary {
-    text-shadow:
-      0 0 4px hsl(var(--primary) / 0.8),
-      0 0 8px hsl(var(--primary) / 0.6),
-      0 0 16px hsl(var(--primary) / 0.4);
+  /* Professional text styles */
+  .text-gradient-primary {
+    background: linear-gradient(135deg, #31487A 0%, #8FB3E2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
-  .text-glow-secondary {
-    text-shadow:
-      0 0 4px hsl(var(--secondary) / 0.8),
-      0 0 8px hsl(var(--secondary) / 0.6),
-      0 0 16px hsl(var(--secondary) / 0.4);
+  
+  .text-gradient-secondary {
+    background: linear-gradient(135deg, #1E2E4F 0%, #31487A 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Professional button hover effects */
+  .btn-professional {
+    @apply transition-all duration-200 ease-in-out;
+    @apply hover:shadow-professional-lg hover:-translate-y-0.5;
+  }
+  
+  /* Card hover effects */
+  .card-professional {
+    @apply transition-all duration-300 ease-in-out;
+    @apply hover:shadow-professional-lg hover:-translate-y-1;
+  }
+  
+  /* Focus styles for accessibility */
+  .focus-professional {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
   }
 }
