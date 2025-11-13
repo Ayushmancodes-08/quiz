@@ -3,6 +3,8 @@
 import type { Quiz, QuizAttempt } from '@/lib/types';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAntiCheat } from '@/hooks/use-anti-cheat';
+import { useMobileAntiCheat } from '@/hooks/use-mobile-anti-cheat';
+import { MobileQuizWarning, MobileQuizBanner } from '@/components/quiz/MobileQuizWarning';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -19,6 +21,7 @@ import { cn } from '@/lib/utils';
 
 enum QuizState {
   CollectingInfo,
+  MobileWarning,
   Instructions,
   InProgress,
   Submitting,
@@ -78,12 +81,40 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     []
   );
 
-  const { violationCount, violationRecords, flagCount, flagRecords } = useAntiCheat({
-    enabled: quizState === QuizState.InProgress,
+  // Detect if mobile
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      ('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0);
+    setIsMobile(checkMobile);
+    
+    // Start with mobile warning if on mobile
+    if (checkMobile && quizState === QuizState.CollectingInfo) {
+      // Will show mobile warning after collecting info
+    }
+  }, []);
+
+  // Use mobile-specific anti-cheat on mobile devices
+  const mobileAntiCheat = useMobileAntiCheat({
+    enabled: isMobile && quizState === QuizState.InProgress,
     onViolation: handleViolation,
     maxViolations: 3,
-    maxFlags: 3, // 3 tab switches before violation
   });
+
+  // Use full anti-cheat on desktop
+  const desktopAntiCheat = useAntiCheat({
+    enabled: !isMobile && quizState === QuizState.InProgress,
+    onViolation: handleViolation,
+    maxViolations: 3,
+    maxFlags: 3,
+  });
+
+  // Use appropriate anti-cheat based on device
+  const { violationCount, flagCount } = isMobile 
+    ? { violationCount: mobileAntiCheat.violationCount, flagCount: mobileAntiCheat.flagCount }
+    : { violationCount: desktopAntiCheat.violationCount, flagCount: desktopAntiCheat.flagCount };
 
   const calculateAndSaveAttempt = useCallback(async (isViolation = false, violationRecords?: any[]) => {
     if (!startTime) {
@@ -248,7 +279,8 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
       });
       return;
     }
-    setQuizState(QuizState.Instructions);
+    // Show mobile warning if on mobile, otherwise go to instructions
+    setQuizState(isMobile ? QuizState.MobileWarning : QuizState.Instructions);
   };
 
   const handleBeginQuiz = () => {
@@ -316,6 +348,22 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
           </CardFooter>
         </Card>
       </div>
+    );
+  }
+
+  // Mobile warning screen
+  if (quizState === QuizState.MobileWarning) {
+    return (
+      <MobileQuizWarning
+        isIncognito={mobileAntiCheat.isIncognito}
+        onProceed={() => setQuizState(QuizState.Instructions)}
+        onOpenIncognito={() => {
+          // Copy current URL
+          const url = window.location.href;
+          // Show instructions for opening in incognito
+          alert('Please:\n1. Copy this URL\n2. Open a new incognito/private window\n3. Paste the URL\n4. Start the quiz');
+        }}
+      />
     );
   }
 
@@ -425,6 +473,11 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   // Quiz in progress
   if (quizState === QuizState.InProgress) {
     return (
+      <>
+        {/* Mobile Banner */}
+        {isMobile && <MobileQuizBanner />}
+        
+        <div>
       <div className="min-h-screen bg-background p-2 md:p-4">
         {/* Warning/Violation Banner */}
         {showViolationWarning && (
@@ -570,6 +623,8 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
           </div>
         </div>
       </div>
+      </div>
+      </>
     );
   }
 

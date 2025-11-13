@@ -1,0 +1,285 @@
+"use client";
+
+import { useEffect, useCallback, useState, useRef } from 'react';
+import { useToast } from '@/hooks/use-toast';
+
+export interface MobileViolationRecord {
+  type: 'screenshot' | 'ai_detected' | 'tab_switch';
+  reason: string;
+  timestamp: number;
+}
+
+export interface MobileFlagRecord {
+  type: 'tab_switch';
+  count: number;
+  timestamp: number;
+}
+
+type UseMobileAntiCheatProps = {
+  enabled: boolean;
+  onViolation: (reason: string, violations?: MobileViolationRecord[], flags?: MobileFlagRecord[]) => void;
+  maxViolations?: number;
+  maxFlags?: number;
+};
+
+export function useMobileAntiCheat({ 
+  enabled, 
+  onViolation, 
+  maxViolations = 3,
+  maxFlags = 3
+}: UseMobileAntiCheatProps) {
+  const { toast } = useToast();
+  const [violationCount, setViolationCount] = useState(0);
+  const [violations, setViolations] = useState<MobileViolationRecord[]>([]);
+  const [flagCount, setFlagCount] = useState(0);
+  const [flags, setFlags] = useState<MobileFlagRecord[]>([]);
+  const [isIncognito, setIsIncognito] = useState<boolean | null>(null);
+  const isDisabledRef = useRef(false);
+  const lastVisibilityChange = useRef<number>(0);
+  const visibilityChangeCount = useRef<number>(0);
+  const monitoringStartTime = useRef<number>(0);
+
+  // Detect incognito mode
+  useEffect(() => {
+    const detectIncognito = async () => {
+      // Method 1: FileSystem API (works on Chrome/Edge)
+      if ('storage' in navigator && 'estimate' in navigator.storage) {
+        try {
+          const estimate = await navigator.storage.estimate();
+          const isLikelyIncognito = estimate.quota && estimate.quota < 120000000; // Less than 120MB
+          setIsIncognito(isLikelyIncognito);
+          return;
+        } catch (e) {
+          // Continue to next method
+        }
+      }
+
+      // Method 2: IndexedDB (works on Firefox)
+      try {
+        const db = indexedDB.open('test');
+        db.onerror = () => setIsIncognito(true);
+        db.onsuccess = () => {
+          setIsIncognito(false);
+          indexedDB.deleteDatabase('test');
+        };
+      } catch (e) {
+        setIsIncognito(null); // Can't detect
+      }
+    };
+
+    detectIncognito();
+  }, []);
+
+  const triggerFlag = useCallback((reason: string) => {
+    if (isDisabledRef.current) return;
+
+    const timestamp = Date.now();
+    
+    setFlags(prev => {
+      const existing = prev.find(f => f.type === 'tab_switch');
+      if (existing) {
+        return prev.map(f => 
+          f.type === 'tab_switch' 
+            ? { ...f, count: f.count + 1, timestamp }
+            : f
+        );
+      } else {
+        return [...prev, { type: 'tab_switch', count: 1, timestamp }];
+      }
+    });
+
+    setFlagCount(prev => {
+      const newCount = prev + 1;
+      
+      setTimeout(() => {
+        toast({
+          variant: 'default',
+          title: `⚠️ Warning: ${reason}`,
+          description: `Warning ${newCount}/${maxFlags}. ${maxFlags - newCount} remaining before violation.`,
+        });
+      }, 0);
+
+      if (newCount >= maxFlags) {
+        triggerViolation('tab_switch', 'Excessive Tab Switching');
+        return 0; // Reset
+      }
+      
+      return newCount;
+    });
+  }, [toast, maxFlags]);
+
+  const triggerViolation = useCallback((
+    type: MobileViolationRecord['type'],
+    reason: string
+  ) => {
+    if (isDisabledRef.current) return;
+
+    const violation: MobileViolationRecord = {
+      type,
+      reason,
+      timestamp: Date.now()
+    };
+
+    setViolations(prev => {
+      const updated = [...prev, violation];
+      
+      if (updated.length >= maxViolations) {
+        isDisabledRef.current = true;
+        setTimeout(() => {
+          onViolation(`Exceeded maximum violations (${maxViolations}).`, updated, flags);
+        }, 0);
+      }
+      
+      return updated;
+    });
+
+    setViolationCount(prev => {
+      const newCount = prev + 1;
+      
+      setTimeout(() => {
+        toast({
+          variant: 'destructive',
+          title: `🚫 Violation: ${reason}`,
+          description: `Violation ${newCount}/${maxViolations}`,
+        });
+      }, 0);
+      
+      return newCount;
+    });
+  }, [toast, maxViolations, onViolation, flags]);
+
+  // Screenshot detection for mobile
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (isDisabledRef.current) return;
+
+    // Android screenshot: Power + Volume Down (can't detect directly)
+    // iOS screenshot: Power + Home or Power + Volume Up (can't detect directly)
+    // But we can detect some keyboard shortcuts if external keyboard is used
+    
+    if (e.key === 'PrintScreen') {
+      e.preventDefault();
+      triggerViolation('screenshot', 'Screenshot Attempt Detected');
+    }
+
+    // Some Android devices with keyboard
+    if (e.ctrlKey && e.shiftKey && e.key === 's') {
+      e.preventDefault();
+      triggerViolation('screenshot', 'Screenshot Shortcut Detected');
+    }
+  }, [triggerViolation]);
+
+  // Detect AI extensions (works on mobile browsers too)
+  const detectAI = useCallback(() => {
+    if (isDisabledRef.current) return;
+
+    const aiIndicators = [
+      'comet',
+      'chatgpt',
+      'claude',
+      'gemini',
+      'copilot',
+    ];
+
+    // Check window properties
+    for (const indicator of aiIndicators) {
+      if ((window as any)[indicator] || (window as any)[`__${indicator}`]) {
+        triggerViolation('ai_detected', `AI Assistant Detected: ${indicator}`);
+        return;
+      }
+    }
+
+    // Check for injected elements
+    const suspiciousElements = document.querySelectorAll(
+      '[class*="ai-"], [id*="ai-"], [class*="comet"], [id*="comet"]'
+    );
+    if (suspiciousElements.length > 0) {
+      triggerViolation('ai_detected', 'AI Extension UI Detected');
+    }
+  }, [triggerViolation]);
+
+  // Tab switch detection with heavy debouncing for mobile
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState === 'hidden' && !isDisabledRef.current) {
+      const now = Date.now();
+      const timeSinceStart = now - monitoringStartTime.current;
+      const timeSinceLastChange = now - lastVisibilityChange.current;
+      
+      // Grace period: Don't monitor for first 10 seconds
+      if (timeSinceStart < 10000) {
+        console.log('Mobile: Within grace period, ignoring visibility change');
+        return;
+      }
+      
+      // Debounce: Ignore rapid changes (< 3 seconds)
+      if (timeSinceLastChange < 3000) {
+        console.log('Mobile: Rapid change detected, ignoring');
+        return;
+      }
+      
+      // Reset count if more than 15 seconds since last change
+      if (timeSinceLastChange > 15000) {
+        visibilityChangeCount.current = 0;
+      }
+      
+      visibilityChangeCount.current++;
+      lastVisibilityChange.current = now;
+      
+      // First 2 changes are free (keyboard, notifications, etc.)
+      if (visibilityChangeCount.current <= 2) {
+        console.log(`Mobile: Free visibility change ${visibilityChangeCount.current}/2`);
+        return;
+      }
+      
+      // After 2 free changes, start flagging
+      triggerFlag('Tab Switch Detected');
+    }
+  }, [triggerFlag]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    console.log('Mobile Anti-Cheat: Enabled');
+    console.log('Monitoring: Tab switches (debounced), Screenshots, AI Detection');
+
+    // Set monitoring start time
+    monitoringStartTime.current = Date.now();
+
+    // Add visibility change listener with debouncing
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Add keyboard listener for screenshot detection
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Check for AI every 10 seconds
+    const aiCheckInterval = setInterval(detectAI, 10000);
+    detectAI(); // Check immediately
+
+    // Disable context menu (prevents some screenshot methods)
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('contextmenu', handleContextMenu);
+
+    // Disable text selection
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('keydown', handleKeyDown);
+      clearInterval(aiCheckInterval);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.body.style.userSelect = 'auto';
+      document.body.style.webkitUserSelect = 'auto';
+      isDisabledRef.current = false;
+    };
+  }, [enabled, handleKeyDown, detectAI, handleVisibilityChange]);
+
+  return {
+    violationCount,
+    violations,
+    flagCount,
+    flags,
+    isIncognito,
+  };
+}
