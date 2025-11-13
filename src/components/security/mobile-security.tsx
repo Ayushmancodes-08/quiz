@@ -64,19 +64,23 @@ export function MobileSecurity({ onViolation }: MobileSecurityProps) {
       }
     };
 
-    // Prevent iOS screenshot (limited capability)
+    // Prevent iOS screenshot (limited capability) - passive monitoring
     const preventIOSScreenshot = () => {
       // iOS doesn't allow direct screenshot prevention
-      // But we can detect and respond
+      // Passive monitoring only - don't trigger violations for normal app switching
       
-      // Detect when app goes to background
+      // Log when app goes to background (passive)
       window.addEventListener('pagehide', () => {
-        handleViolation('ios_background');
+        securityLogger.detection('iOS app backgrounded (passive monitoring)', {
+          level: 'info',
+        });
       });
 
-      // Detect focus loss
+      // Log focus loss (passive)
       window.addEventListener('blur', () => {
-        handleViolation('ios_blur');
+        securityLogger.detection('iOS focus lost (passive monitoring)', {
+          level: 'info',
+        });
       });
     };
 
@@ -187,15 +191,7 @@ export function MobileSecurity({ onViolation }: MobileSecurityProps) {
       
       document.addEventListener('touchstart', preventLongPress);
       
-      // Disable screenshot via CSS (Android WebView)
-      document.body.style.cssText += `
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        -khtml-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-      `;
+      // Note: Text selection blocking removed to allow quiz interaction on mobile
     }
 
     // Periodic automation checks

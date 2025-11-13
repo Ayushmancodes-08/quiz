@@ -91,28 +91,46 @@ export function AntiScreenshot({
         return false;
       }
 
-      // Prevent Ctrl+S (save page)
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
-        e.preventDefault();
-        handleViolation('save_page_attempt');
-        return false;
-      }
+      // Note: Removed Ctrl+S blocking to allow form submissions
     };
 
-    // Detect visibility change (tab switching)
+    // Detect visibility change (tab switching) - passive monitoring only
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        handleViolation('tab_switch');
+        // Log only, don't show toast or count as violation
+        securityLogger.detection('Tab switch detected (passive monitoring)', {
+          level: 'info',
+          data: {
+            'Event': 'Tab hidden',
+            'URL': window.location.pathname,
+          }
+        });
       }
     };
 
-    // Detect blur (window switching)
+    // Detect blur (window switching) - passive monitoring only
     const handleBlur = () => {
-      handleViolation('window_blur');
+      // Log only, don't show toast or count as violation
+      securityLogger.detection('Window blur detected (passive monitoring)', {
+        level: 'info',
+      });
     };
 
-    // Prevent right-click context menu
+    // Prevent right-click context menu - but allow on form elements
     const preventContextMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Allow right-click on input fields, textareas, and buttons
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'SELECT' ||
+        target.closest('form') !== null
+      ) {
+        return true; // Allow context menu on form elements
+      }
+      
       e.preventDefault();
       handleViolation('context_menu');
       return false;
@@ -345,9 +363,8 @@ export function AntiScreenshot({
     const automationInterval = setInterval(detectAutomation, 5000);
     const watermarkInterval = setInterval(createWatermark, 30000);
 
-    // Prevent text selection and copy
-    document.body.style.userSelect = 'none';
-    document.body.style.webkitUserSelect = 'none';
+    // Note: Text selection blocking removed to allow quiz interaction
+    // Users can select text in quiz questions and answers
 
     return () => {
       isActive = false;
@@ -361,8 +378,6 @@ export function AntiScreenshot({
       if (redirectTimeoutRef.current) {
         clearTimeout(redirectTimeoutRef.current);
       }
-      document.body.style.userSelect = '';
-      document.body.style.webkitUserSelect = '';
     };
   }, [onViolation, enableWarnings, redirectOnViolation, router, toast]);
 
