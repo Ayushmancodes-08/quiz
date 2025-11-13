@@ -130,87 +130,173 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     }
   }, [triggerViolation]);
 
-  // 4. Detect AI agents and automation tools
+  // 4. Detect AI agents, browser extensions, and automation tools
   const detectAutomation = useCallback(() => {
     if (isDisabledRef.current) return;
 
     const checks: string[] = [];
+    let suspicionScore = 0; // Track suspicious behavior
 
+    // === AI Browser Extension Detection ===
+    
+    // Check for common AI extension properties
+    const aiExtensionIndicators = [
+      'comet',
+      'chatgpt',
+      'claude',
+      'gemini',
+      'copilot',
+      'perplexity',
+      'bard',
+      'openai',
+      'anthropic',
+      'ai_assistant',
+      'ai_helper',
+      'ai_copilot',
+    ];
+
+    // Check window properties for AI extensions
+    for (const indicator of aiExtensionIndicators) {
+      if ((window as any)[indicator] || (window as any)[`__${indicator}`] || (window as any)[`_${indicator}`]) {
+        checks.push(`AI extension detected: ${indicator}`);
+        suspicionScore += 10;
+        break;
+      }
+    }
+
+    // Check for extension-injected elements
+    const suspiciousElements = document.querySelectorAll('[class*="ai-"], [id*="ai-"], [class*="comet"], [id*="comet"], [class*="chatgpt"], [id*="chatgpt"]');
+    if (suspiciousElements.length > 0) {
+      checks.push('AI extension UI elements detected');
+      suspicionScore += 8;
+    }
+
+    // Check for extension-injected scripts
+    const scripts = Array.from(document.querySelectorAll('script'));
+    const suspiciousScripts = scripts.filter(script => {
+      const src = script.src.toLowerCase();
+      return aiExtensionIndicators.some(indicator => src.includes(indicator));
+    });
+    if (suspiciousScripts.length > 0) {
+      checks.push('AI extension scripts detected');
+      suspicionScore += 10;
+    }
+
+    // Monitor for unusual DOM mutations (AI extensions often inject content)
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as Element;
+              const className = element.className?.toString().toLowerCase() || '';
+              const id = element.id?.toLowerCase() || '';
+              
+              if (aiExtensionIndicators.some(indicator => 
+                className.includes(indicator) || id.includes(indicator)
+              )) {
+                checks.push('AI extension content injection detected');
+                suspicionScore += 7;
+              }
+            }
+          });
+        }
+      }
+    });
+
+    // Check for Chrome extension APIs being used
+    if ((window as any).chrome?.runtime?.sendMessage) {
+      // Try to detect if extensions are actively communicating
+      try {
+        const originalSendMessage = (window as any).chrome.runtime.sendMessage;
+        (window as any).chrome.runtime.sendMessage = function(...args: any[]) {
+          checks.push('Extension communication detected');
+          suspicionScore += 5;
+          return originalSendMessage.apply(this, args);
+        };
+      } catch (e) {
+        // Extension API might be restricted
+      }
+    }
+
+    // === Behavioral Analysis ===
+    
+    // Check for suspiciously fast answer times (AI assistance indicator)
+    const answerTimes: number[] = [];
+    let lastAnswerTime = Date.now();
+    
+    document.addEventListener('change', () => {
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastAnswerTime;
+      answerTimes.push(timeDiff);
+      lastAnswerTime = currentTime;
+      
+      // If answering too quickly consistently (< 5 seconds), might be using AI
+      if (answerTimes.length >= 3) {
+        const avgTime = answerTimes.reduce((a, b) => a + b, 0) / answerTimes.length;
+        if (avgTime < 5000) {
+          checks.push('Suspiciously fast answer pattern detected');
+          suspicionScore += 6;
+        }
+      }
+    });
+
+    // === Traditional Automation Detection ===
+    
     // Check for WebDriver property (Selenium, Puppeteer, Playwright)
     if ((window as any).navigator?.webdriver === true) {
       checks.push('WebDriver detected');
+      suspicionScore += 10;
     }
 
     // Check for Chrome DevTools Protocol
     if ((window as any).chrome?.runtime?.onConnect) {
-      // Check if DevTools is being controlled
       if ((window as any).__selenium_unwrapped || (window as any).__webdriver_evaluate || (window as any).__driver_evaluate) {
         checks.push('Chrome DevTools Protocol detected');
+        suspicionScore += 10;
       }
     }
 
     // Check for headless browser indicators
-    if (navigator.plugins.length === 0) {
-      checks.push('No plugins detected (headless indicator)');
+    if (navigator.plugins.length === 0 && !navigator.userAgent.includes('Mobile')) {
+      checks.push('No plugins detected (possible headless browser)');
+      suspicionScore += 5;
     }
 
     // Check for automation frameworks
     if ((window as any).callPhantom || (window as any)._phantom || (window as any).__nightmare) {
       checks.push('PhantomJS/Nightmare detected');
+      suspicionScore += 10;
     }
 
     if ((window as any).domAutomation || (window as any).domAutomationController) {
       checks.push('DOM automation detected');
+      suspicionScore += 10;
     }
 
     // Check user agent for automation indicators
     const userAgent = navigator.userAgent.toLowerCase();
     if (userAgent.includes('headless') || userAgent.includes('phantom') || userAgent.includes('selenium')) {
       checks.push('Automation user agent detected');
+      suspicionScore += 10;
     }
 
     // Check for missing properties that real browsers have
     if (!navigator.languages || navigator.languages.length === 0) {
       checks.push('Missing language properties');
+      suspicionScore += 4;
     }
 
     // Check for automation-specific properties
     if ((window as any).navigator?.webdriver || (document as any).$cdc_asdjflasutopfhvcZLmcfl_ || (document as any).$chrome_asyncScriptInfo) {
       checks.push('Automation properties detected');
+      suspicionScore += 10;
     }
 
     // Check screen properties (headless browsers often have unusual resolutions)
     if (screen.width === 0 || screen.height === 0 || window.innerWidth === 0 || window.innerHeight === 0) {
       checks.push('Invalid screen dimensions');
-    }
-
-    // Check for automation-related permissions
-    if (navigator.permissions) {
-      try {
-        const permissions = (navigator as any).permissions;
-        if (permissions.query && typeof permissions.query !== 'function') {
-          checks.push('Modified permissions API');
-        }
-      } catch (e) {
-        // Ignore errors
-      }
-    }
-
-    // Check for automation browser extensions
-    if ((window as any).chrome?.runtime) {
-      try {
-        const runtime = (window as any).chrome.runtime;
-        if (runtime.onConnect && typeof runtime.onConnect.addListener === 'undefined') {
-          checks.push('Modified Chrome runtime API');
-        }
-      } catch (e) {
-        // Ignore errors
-      }
-    }
-
-    // Check for missing or modified browser APIs that automation tools often break
-    if (typeof window.getComputedStyle === 'undefined' || typeof document.createElement === 'undefined') {
-      checks.push('Missing core browser APIs');
+      suspicionScore += 8;
     }
 
     // Check for automation-specific window properties
@@ -239,16 +325,26 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     for (const prop of automationProps) {
       if ((window as any)[prop] !== undefined) {
         checks.push(`Automation property detected: ${prop}`);
-        break; // Only report once
+        suspicionScore += 10;
+        break;
       }
     }
 
-    if (checks.length > 0) {
-      triggerViolation('ai_agent', 'AI Agent/Automation Detected', `Detected: ${checks.join(', ')}`);
+    // === Realistic Violation Triggering ===
+    // Only trigger violation if suspicion score is high enough
+    // This prevents false positives from legitimate browser variations
+    
+    if (suspicionScore >= 10) {
+      const severity = suspicionScore >= 20 ? 'High' : suspicionScore >= 15 ? 'Medium' : 'Low';
+      triggerViolation(
+        'ai_agent', 
+        'AI Assistant/Automation Detected', 
+        `Detected: ${checks.join(', ')} | Severity: ${severity} (Score: ${suspicionScore})`
+      );
     }
   }, [triggerViolation]);
 
-  // Monitor for screenshot tools that might use canvas or other methods
+  // Monitor for screenshot tools, AI assistance, and clipboard activity
   useEffect(() => {
     if (!enabled || isDisabledRef.current) return;
 
@@ -273,24 +369,70 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     };
 
     // Detect Circle to Search through image search APIs
-    // Override fetch to detect image search requests
+    // Override fetch to detect image search and AI API requests
     const originalFetch = window.fetch;
     window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
-      const url = input.toString();
+      const url = input.toString().toLowerCase();
+      
+      // Detect image search
       if (url.includes('lens.google.com') || 
           url.includes('google.com/searchbyimage') ||
           url.includes('reverse-image-search') ||
           (url.includes('google.com') && url.includes('image'))) {
         triggerViolation('circle_to_search', 'Circle to Search Detected', 'Image search detected (Circle to Search).');
       }
+      
+      // Detect AI API calls
+      const aiApiDomains = [
+        'openai.com',
+        'api.openai.com',
+        'anthropic.com',
+        'api.anthropic.com',
+        'cohere.ai',
+        'ai.google.dev',
+        'generativelanguage.googleapis.com',
+        'api.perplexity.ai',
+        'api.together.xyz',
+        'api.replicate.com',
+      ];
+      
+      if (aiApiDomains.some(domain => url.includes(domain))) {
+        triggerViolation('ai_agent', 'AI API Request Detected', `External AI service call detected: ${url.split('/')[2]}`);
+      }
+      
       return originalFetch.call(this, input, init);
     };
+
+    // Monitor clipboard for suspicious paste activity
+    const handlePaste = async (e: ClipboardEvent) => {
+      const pastedText = e.clipboardData?.getData('text');
+      
+      if (pastedText && pastedText.length > 50) {
+        // Long paste might indicate copying from AI
+        triggerViolation('ai_agent', 'Suspicious Paste Detected', `Large text paste detected (${pastedText.length} characters). Possible AI-generated content.`);
+      }
+    };
+
+    // Monitor for copy events (might be copying questions to AI)
+    let copyCount = 0;
+    const handleCopy = (e: ClipboardEvent) => {
+      copyCount++;
+      if (copyCount >= 3) {
+        triggerViolation('ai_agent', 'Excessive Copy Activity', 'Multiple copy operations detected. Questions may be copied to external AI tools.');
+        copyCount = 0; // Reset after violation
+      }
+    };
+
+    document.addEventListener('paste', handlePaste);
+    document.addEventListener('copy', handleCopy);
 
     return () => {
       HTMLCanvasElement.prototype.toDataURL = originalToDataURL;
       HTMLCanvasElement.prototype.toBlob = originalToBlob;
       CanvasRenderingContext2D.prototype.getImageData = originalGetImageData;
       window.fetch = originalFetch;
+      document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('copy', handleCopy);
     };
   }, [enabled, triggerViolation]);
 

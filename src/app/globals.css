@@ -7,14 +7,14 @@
     /* Professional Light Mode Theme */
     /* Using: Space Cadet (#1E2E4F), YinMn Blue (#31487A), Jordy Blue (#8FB3E2) */
     
-    --background: 210 40% 98%; /* Very light blue-white */
-    --foreground: 215 30% 20%; /* Dark blue-gray for text */
+    --background: 218 44% 98%; /* Very light YinMn Blue tint */
+    --foreground: 218 44% 15%; /* Dark YinMn Blue for text */
 
     --card: 0 0% 100%; /* Pure white cards */
-    --card-foreground: 215 30% 20%;
+    --card-foreground: 218 44% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 30% 20%;
+    --popover-foreground: 218 44% 15%;
 
     --primary: 218 44% 29%; /* YinMn Blue #31487A */
     --primary-foreground: 0 0% 100%;
@@ -22,36 +22,36 @@
     --secondary: 215 45% 20%; /* Space Cadet #1E2E4F */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96%; /* Very light blue-gray */
-    --muted-foreground: 215 20% 45%;
+    --muted: 218 44% 96%; /* Very light YinMn Blue */
+    --muted-foreground: 218 30% 45%;
 
     --accent: 213 73% 72%; /* Jordy Blue #8FB3E2 */
-    --accent-foreground: 215 30% 20%;
+    --accent-foreground: 218 44% 15%;
     
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 213 30% 88%; /* Light blue-gray border */
-    --input: 213 30% 88%;
+    --border: 218 30% 88%; /* Light YinMn Blue border */
+    --input: 218 30% 88%;
     --ring: 218 44% 29%; /* YinMn Blue */
 
     --radius: 0.5rem;
     
-    /* Chart colors using the blue palette */
+    /* Chart colors using YinMn Blue palette */
     --chart-1: 218 44% 29%; /* YinMn Blue */
-    --chart-2: 213 73% 72%; /* Jordy Blue */
-    --chart-3: 215 45% 20%; /* Space Cadet */
-    --chart-4: 213 60% 55%; /* Mid blue */
-    --chart-5: 210 50% 85%; /* Light blue */
+    --chart-2: 218 44% 45%; /* Lighter YinMn Blue */
+    --chart-3: 218 44% 60%; /* Even lighter YinMn Blue */
+    --chart-4: 218 44% 75%; /* Very light YinMn Blue */
+    --chart-5: 218 44% 90%; /* Extremely light YinMn Blue */
     
     /* Sidebar colors */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 30% 20%;
+    --sidebar-foreground: 218 44% 15%;
     --sidebar-primary: 218 44% 29%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 215 30% 20%;
-    --sidebar-border: 213 30% 88%;
+    --sidebar-accent: 218 44% 96%;
+    --sidebar-accent-foreground: 218 44% 15%;
+    --sidebar-border: 218 30% 88%;
     --sidebar-ring: 218 44% 29%;
   }
 }
