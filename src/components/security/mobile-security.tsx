@@ -92,11 +92,18 @@ export function MobileSecurity({ onViolation }: MobileSecurityProps) {
       meta.content = 'disabled';
       document.head.appendChild(meta);
 
-      // Detect if running in screen recording mode
-      if (window.screen.width !== window.innerWidth || 
-          window.screen.height !== window.innerHeight) {
-        handleViolation('screen_recording_suspected');
-      }
+      // DISABLED: Screen size check causes false positives on mobile
+      // Mobile browsers often have different screen vs window dimensions due to:
+      // - Browser UI (address bar, navigation)
+      // - System UI (status bar, navigation bar)
+      // - Keyboard
+      // - Zoom level
+      // This check is unreliable and causes false positives
+      
+      // if (window.screen.width !== window.innerWidth || 
+      //     window.screen.height !== window.innerHeight) {
+      //   handleViolation('screen_recording_suspected');
+      // }
     };
 
     // Detect mobile automation tools
