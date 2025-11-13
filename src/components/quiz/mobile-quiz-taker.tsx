@@ -78,10 +78,11 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     []
   );
 
-  const { violationCount, violationRecords } = useAntiCheat({
-    enabled: false,
+  const { violationCount, violationRecords, flagCount, flagRecords } = useAntiCheat({
+    enabled: quizState === QuizState.InProgress,
     onViolation: handleViolation,
     maxViolations: 3,
+    maxFlags: 3, // 3 tab switches before violation
   });
 
   const calculateAndSaveAttempt = useCallback(async (isViolation = false, violationRecords?: any[]) => {
@@ -386,10 +387,11 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
             <div className="bg-primary/10 border border-primary/20 p-6 rounded-lg space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <Shield className="w-5 h-5" />
-                Violation Policy
+                Warning & Violation Policy
               </h3>
               <p className="text-sm md:text-base">
-                You are allowed <strong>2 warnings</strong>. On the <strong>3rd violation</strong>, your quiz will be automatically submitted and flagged for review.
+                <strong>Warnings:</strong> You get <strong>3 warnings</strong> for tab switches. After 3 warnings, it becomes 1 violation.<br/>
+                <strong>Violations:</strong> You are allowed <strong>2 violations</strong>. On the <strong>3rd violation</strong>, your quiz will be automatically submitted and flagged for review.
               </p>
             </div>
 
@@ -424,10 +426,23 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   if (quizState === QuizState.InProgress) {
     return (
       <div className="min-h-screen bg-background p-2 md:p-4">
-        {/* Violation Warning Banner */}
+        {/* Warning/Violation Banner */}
         {showViolationWarning && (
-          <div className="fixed top-0 left-0 right-0 z-50 bg-destructive text-destructive-foreground p-4 text-center font-semibold animate-in slide-in-from-top">
-            ⚠️ Violation Detected! ({violationCount}/3)
+          <div className={cn(
+            "fixed top-0 left-0 right-0 z-50 p-4 text-center font-semibold animate-in slide-in-from-top",
+            flagCount > 0 && flagCount < 3 && "bg-yellow-500 text-yellow-950",
+            flagCount >= 3 && "bg-orange-500 text-orange-950",
+            violationCount > 0 && "bg-destructive text-destructive-foreground"
+          )}>
+            {flagCount > 0 && flagCount < 3 && (
+              <>⚠️ Warning {flagCount}/3: Tab Switch Detected. {3 - flagCount} warnings remaining before violation.</>
+            )}
+            {flagCount >= 3 && violationCount === 0 && (
+              <>🚫 Violation: Excessive Tab Switching! Violations: {violationCount + 1}/3</>
+            )}
+            {violationCount > 0 && (
+              <>🚫 Violation Detected! ({violationCount}/3)</>
+            )}
           </div>
         )}
 
@@ -441,16 +456,32 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
                   Question {currentQuestionIndex + 1} of {quiz.questions.length}
                 </p>
               </div>
-              <div className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
-                violationCount === 0 && "bg-green-500/10 text-green-500",
-                violationCount === 1 && "bg-yellow-500/10 text-yellow-500",
-                violationCount === 2 && "bg-orange-500/10 text-orange-500",
-                violationCount >= 3 && "bg-destructive/10 text-destructive"
-              )}>
-                <Shield className="w-4 h-4" />
-                <span className="hidden sm:inline">Violations:</span>
-                <span className="font-bold">{violationCount}/3</span>
+              <div className="flex items-center gap-3">
+                {/* Warnings/Flags Counter */}
+                <div className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
+                  flagCount === 0 && "bg-green-500/10 text-green-500",
+                  flagCount === 1 && "bg-yellow-500/10 text-yellow-500",
+                  flagCount === 2 && "bg-orange-500/10 text-orange-500",
+                  flagCount >= 3 && "bg-red-500/10 text-red-500"
+                )}>
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="hidden sm:inline">Warnings:</span>
+                  <span className="font-bold">{flagCount}/3</span>
+                </div>
+
+                {/* Violations Counter */}
+                <div className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
+                  violationCount === 0 && "bg-green-500/10 text-green-500",
+                  violationCount === 1 && "bg-yellow-500/10 text-yellow-500",
+                  violationCount === 2 && "bg-orange-500/10 text-orange-500",
+                  violationCount >= 3 && "bg-destructive/10 text-destructive"
+                )}>
+                  <Shield className="w-4 h-4" />
+                  <span className="hidden sm:inline">Violations:</span>
+                  <span className="font-bold">{violationCount}/3</span>
+                </div>
               </div>
             </div>
             <Progress value={progress} className="h-2" />
