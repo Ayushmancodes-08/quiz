@@ -124,26 +124,41 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
   const isMobile = useRef(false);
   const lastVisibilityChange = useRef<number>(0);
   const visibilityChangeCount = useRef<number>(0);
+  const monitoringStartTime = useRef<number>(0);
+  const isMonitoringActive = useRef(false);
 
   useEffect(() => {
     // Detect mobile device
     isMobile.current = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
       ('ontouchstart' in window) ||
       (navigator.maxTouchPoints > 0);
+    
+    console.log('Device type:', isMobile.current ? 'Mobile' : 'Desktop');
   }, []);
 
-  // 1. Detect browser/tab changes - MOBILE-FRIENDLY with debouncing
+  // 1. Detect browser/tab changes - COMPLETELY DISABLED ON MOBILE
   const handleVisibilityChange = useCallback(() => {
+    // COMPLETELY DISABLE visibility monitoring on mobile
+    if (isMobile.current) {
+      console.log('Visibility monitoring disabled on mobile');
+      return;
+    }
+    
+    // Only monitor if enough time has passed since monitoring started (5 second grace period)
+    if (!isMonitoringActive.current) {
+      console.log('Monitoring not active yet - grace period');
+      return;
+    }
+    
+    const timeSinceStart = Date.now() - monitoringStartTime.current;
+    if (timeSinceStart < 5000) {
+      console.log('Within grace period - ignoring visibility change');
+      return;
+    }
+    
     if (document.visibilityState === 'hidden' && !isDisabledRef.current) {
       const now = Date.now();
       const timeSinceLastChange = now - lastVisibilityChange.current;
-      
-      // On mobile, ignore rapid visibility changes (< 2 seconds)
-      // These are usually from keyboard, notifications, or system UI
-      if (isMobile.current && timeSinceLastChange < 2000) {
-        console.log('Ignoring rapid visibility change on mobile');
-        return;
-      }
       
       // Reset count if more than 10 seconds since last change
       if (timeSinceLastChange > 10000) {
@@ -152,12 +167,6 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
       
       visibilityChangeCount.current++;
       lastVisibilityChange.current = now;
-      
-      // On mobile, only flag after 2 visibility changes (to avoid false positives)
-      if (isMobile.current && visibilityChangeCount.current < 2) {
-        console.log('First visibility change on mobile - not flagging yet');
-        return;
-      }
       
       // Tab switch is a flag, not immediate violation
       triggerFlag('tab_switch', 'Tab Switch Detected');
@@ -623,11 +632,26 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     }
     requestWakeLock(); // Wake lock works on mobile
 
-    // Add event listeners
+    // Add event listeners with startup delay
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // IMPORTANT: Add visibility listener ONLY on desktop
+    if (!isMobile.current) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      console.log('Visibility monitoring enabled (Desktop)');
+    } else {
+      console.log('Visibility monitoring DISABLED (Mobile)');
+    }
+    
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('keydown', handleKeyDown);
+    
+    // Activate monitoring after 5 second grace period
+    setTimeout(() => {
+      monitoringStartTime.current = Date.now();
+      isMonitoringActive.current = true;
+      console.log('Anti-cheat monitoring now active');
+    }, 5000);
     
     // Disable text selection
     document.body.style.userSelect = 'none';
@@ -688,7 +712,12 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
 
       // Remove event listeners
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Only remove visibility listener if it was added (desktop only)
+      if (!isMobile.current) {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+      
       document.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keydown', blockExitShortcuts);
