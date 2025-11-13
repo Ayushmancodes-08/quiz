@@ -24,7 +24,8 @@ const formSchema = z.object({
   topic: z.string().min(3, 'Topic must be at least 3 characters long.'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   numQuestions: z.coerce.number().int().min(1).max(10),
-  title: z.string().min(3, 'Title must be at least 3 characters long.')
+  title: z.string().min(3, 'Title must be at least 3 characters long.'),
+  timeLimit: z.coerce.number().int().min(1).max(180).optional() // 1-180 minutes
 });
 
 export function CreateQuizForm() {
@@ -42,6 +43,7 @@ export function CreateQuizForm() {
       title: '',
       difficulty: 'medium',
       numQuestions: 5,
+      timeLimit: 30, // Default 30 minutes
     },
   });
 
@@ -280,6 +282,25 @@ export function CreateQuizForm() {
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="timeLimit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Time Limit (minutes) - Optional</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="1" 
+                      max="180" 
+                      placeholder="e.g., 30 (leave empty for no limit)"
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </CardContent>
           <CardFooter>
             <Button type="submit" disabled={isGenerating}>

@@ -24,6 +24,8 @@ This document specifies requirements for enhancing the quiz platform's anti-chea
 - **Mobile Device**: Smartphones and tablets with touch interfaces
 - **Desktop Device**: Computers with keyboard and mouse interfaces
 - **Responsive Design**: User interface that adapts layout and functionality based on device screen size
+- **Circle to Search**: A mobile feature that allows users to search for content by circling or selecting screen areas
+- **Headless Browser**: A browser running without a graphical user interface, often used for automation
 
 ## Requirements
 
@@ -108,13 +110,28 @@ This document specifies requirements for enhancing the quiz platform's anti-chea
 #### Acceptance Criteria
 
 1. WHEN a Student accesses the quiz on a Mobile Device, THE Quiz System SHALL detect the device type within 100 milliseconds
-2. WHEN a Student uses a Mobile Device, THE Quiz System SHALL disable keyboard-specific restrictions that are not applicable to touch interfaces
-3. WHEN a Student uses a Mobile Device, THE Quiz System SHALL adapt Full-Screen Mode enforcement to respect mobile browser limitations
-4. WHEN a Student uses a Mobile Device, THE Quiz System SHALL maintain focus loss detection for app switching
-5. THE Quiz System SHALL apply copy/paste prevention consistently across Desktop Devices and Mobile Devices
-6. THE Quiz System SHALL ensure all anti-cheat UI warnings and messages are readable and accessible on screens as small as 320 pixels wide
+2. WHEN a Student uses a Mobile Device, THE Quiz System SHALL ONLY enable tab switching detection and Circle to Search detection
+3. WHEN a Student uses a Mobile Device, THE Quiz System SHALL NOT check for Headless Browser indicators
+4. WHEN a Student uses a Mobile Device, THE Quiz System SHALL NOT check for screen recording software
+5. WHEN a Student uses a Mobile Device, THE Quiz System SHALL NOT check for AI browser extensions
+6. WHEN a Student uses a Mobile Device, THE Quiz System SHALL maintain focus loss detection for app switching with appropriate debouncing
+7. WHEN Circle to Search is detected on a Mobile Device, THE Quiz System SHALL log the attempt and increment the Violation Counter
+8. THE Quiz System SHALL ensure all anti-cheat UI warnings and messages are readable and accessible on screens as small as 320 pixels wide
 
-### Requirement 8: Cross-Browser Compatibility
+### Requirement 8: Circle to Search Detection
+
+**User Story:** As an Admin, I want to detect when mobile students use Circle to Search features, so that I can identify attempts to search for quiz answers using mobile-specific tools.
+
+#### Acceptance Criteria
+
+1. WHEN a Student on a Mobile Device activates Circle to Search, THE Quiz System SHALL detect the gesture within 500 milliseconds
+2. WHEN Circle to Search is detected, THE Quiz System SHALL increment the Violation Counter by one
+3. WHEN Circle to Search is detected, THE Quiz System SHALL display a warning message to the Student
+4. THE Quiz System SHALL log Circle to Search attempts with timestamps for Admin review
+5. THE Quiz System SHALL detect Circle to Search through long-press gestures and selection overlay patterns
+6. WHEN Circle to Search detection produces false positives, THE Quiz System SHALL implement grace periods to prevent unfair violations
+
+### Requirement 9: Cross-Browser Compatibility
 
 **User Story:** As a Student, I want anti-cheat features to work consistently across different browsers, so that I have a fair testing experience regardless of my browser choice.
 
@@ -126,7 +143,20 @@ This document specifies requirements for enhancing the quiz platform's anti-chea
 4. THE Quiz System SHALL maintain core anti-cheat functionality (focus detection, copy prevention) across all supported browsers
 5. WHEN advanced features like keyboard lock are unavailable, THE Quiz System SHALL continue quiz operation with available security measures
 
-### Requirement 9: Violation Tracking and Reporting
+### Requirement 10: Desktop-Specific Advanced Detection
+
+**User Story:** As an Admin, I want comprehensive anti-cheat detection on desktop devices, so that I can identify sophisticated cheating attempts while avoiding false positives on mobile devices.
+
+#### Acceptance Criteria
+
+1. WHEN a Student uses a Desktop Device, THE Quiz System SHALL enable Headless Browser detection
+2. WHEN a Student uses a Desktop Device, THE Quiz System SHALL enable AI browser extension detection
+3. WHEN a Student uses a Desktop Device, THE Quiz System SHALL enable screen recording detection
+4. WHEN a Student uses a Desktop Device, THE Quiz System SHALL enable developer tools detection
+5. THE Quiz System SHALL NOT apply desktop-specific advanced detection to Mobile Devices
+6. WHEN advanced detection identifies suspicious behavior on Desktop Devices, THE Quiz System SHALL log the detection with detailed context
+
+### Requirement 11: Violation Tracking and Reporting
 
 **User Story:** As an Admin, I want detailed violation reports for each quiz attempt, so that I can identify suspicious behavior and make informed decisions about quiz validity.
 
@@ -139,7 +169,7 @@ This document specifies requirements for enhancing the quiz platform's anti-chea
 5. THE Quiz System SHALL flag quiz attempts with three or more violations for Admin review
 6. THE Quiz System SHALL provide filtering options to view only flagged attempts
 
-### Requirement 10: Performance and User Experience
+### Requirement 12: Performance and User Experience
 
 **User Story:** As a Student, I want anti-cheat features to run smoothly without causing lag or disrupting my quiz-taking experience, so that I can focus on answering questions.
 

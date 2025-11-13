@@ -18,6 +18,7 @@ export type Quiz = {
   questions: Question[];
   authorId: string;
   createdAt: string; // ISO date string
+  timeLimit?: number; // Time limit in minutes (optional)
 };
 
 export type QuizAttempt = {
