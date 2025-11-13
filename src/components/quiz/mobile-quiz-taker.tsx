@@ -81,20 +81,14 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     []
   );
 
-  // Detect if mobile
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+  // Detect if mobile IMMEDIATELY (not in useEffect to avoid desktop anti-cheat running first)
+  const [isMobile] = useState(() => {
+    // Check on initial render
+    if (typeof window === 'undefined') return false;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
       ('ontouchstart' in window) ||
       (navigator.maxTouchPoints > 0);
-    setIsMobile(checkMobile);
-    
-    // Start with mobile warning if on mobile
-    if (checkMobile && quizState === QuizState.CollectingInfo) {
-      // Will show mobile warning after collecting info
-    }
-  }, []);
+  });
 
   // Use mobile-specific anti-cheat on mobile devices
   const mobileAntiCheat = useMobileAntiCheat({

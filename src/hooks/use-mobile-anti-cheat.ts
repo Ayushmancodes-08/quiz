@@ -168,10 +168,12 @@ export function useMobileAntiCheat({
     }
   }, [triggerViolation]);
 
-  // Detect AI extensions (works on mobile browsers too)
+  // Detect AI extensions (SIMPLIFIED for mobile - no automation checks)
   const detectAI = useCallback(() => {
     if (isDisabledRef.current) return;
 
+    // ONLY check for AI extensions, NOT automation/headless browsers
+    // Automation checks cause false positives on mobile browsers
     const aiIndicators = [
       'comet',
       'chatgpt',
@@ -180,7 +182,7 @@ export function useMobileAntiCheat({
       'copilot',
     ];
 
-    // Check window properties
+    // Check window properties for AI extensions ONLY
     for (const indicator of aiIndicators) {
       if ((window as any)[indicator] || (window as any)[`__${indicator}`]) {
         triggerViolation('ai_detected', `AI Assistant Detected: ${indicator}`);
@@ -188,13 +190,19 @@ export function useMobileAntiCheat({
       }
     }
 
-    // Check for injected elements
+    // Check for injected AI elements ONLY
     const suspiciousElements = document.querySelectorAll(
       '[class*="ai-"], [id*="ai-"], [class*="comet"], [id*="comet"]'
     );
     if (suspiciousElements.length > 0) {
       triggerViolation('ai_detected', 'AI Extension UI Detected');
     }
+
+    // DO NOT check for:
+    // - navigator.webdriver (false positive on some mobile browsers)
+    // - navigator.plugins (mobile browsers often have 0 plugins)
+    // - screen dimensions (varies on mobile)
+    // - automation properties (not relevant on mobile)
   }, [triggerViolation]);
 
   // Tab switch detection with heavy debouncing for mobile
