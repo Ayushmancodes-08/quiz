@@ -3,25 +3,36 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-export type ViolationType = 'screenshot' | 'circle_to_search' | 'browser_change' | 'ai_agent';
+export type ViolationType = 'screenshot' | 'circle_to_search' | 'browser_change' | 'ai_agent' | 'tab_switch';
 
 export interface ViolationRecord {
   type: ViolationType;
   reason: string;
   timestamp: number;
   details?: string;
+  severity?: 'low' | 'medium' | 'high';
+}
+
+export interface FlagRecord {
+  type: 'tab_switch' | 'focus_loss' | 'suspicious_activity';
+  reason: string;
+  timestamp: number;
+  count: number;
 }
 
 type UseAntiCheatProps = {
   enabled: boolean;
-  onViolation: (reason: string, violationRecords?: ViolationRecord[]) => void;
+  onViolation: (reason: string, violationRecords?: ViolationRecord[], flags?: FlagRecord[]) => void;
   maxViolations?: number;
+  maxFlags?: number; // Tab switches before violation
 };
 
-export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAntiCheatProps) {
+export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags = 5 }: UseAntiCheatProps) {
   const { toast } = useToast();
   const [violationCount, setViolationCount] = useState(0);
   const [violationRecords, setViolationRecords] = useState<ViolationRecord[]>([]);
+  const [flagCount, setFlagCount] = useState(0);
+  const [flagRecords, setFlagRecords] = useState<FlagRecord[]>([]);
   const isDisabledRef = useRef(false);
   const automationCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -33,11 +44,53 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     maxViolationsRef.current = maxViolations;
   }, [onViolation, maxViolations]);
 
-  const triggerViolation = useCallback((type: ViolationType, reason: string, details?: string) => {
+  const triggerFlag = useCallback((type: FlagRecord['type'], reason: string) => {
     if (isDisabledRef.current) return;
 
     const timestamp = Date.now();
-    const record: ViolationRecord = { type, reason, timestamp, details };
+    
+    setFlagRecords(prev => {
+      const existingFlag = prev.find(f => f.type === type);
+      if (existingFlag) {
+        // Increment existing flag count
+        return prev.map(f => 
+          f.type === type 
+            ? { ...f, count: f.count + 1, timestamp }
+            : f
+        );
+      } else {
+        // Add new flag
+        return [...prev, { type, reason, timestamp, count: 1 }];
+      }
+    });
+
+    setFlagCount(prev => {
+      const newCount = prev + 1;
+      
+      // Show warning toast
+      setTimeout(() => {
+        toast({
+          variant: 'default',
+          title: `⚠️ Warning: ${reason}`,
+          description: `Flag ${newCount}/${maxFlags}. ${maxFlags - newCount} warnings remaining before violation.`,
+        });
+      }, 0);
+
+      // Convert to violation if max flags reached
+      if (newCount >= maxFlags) {
+        triggerViolation('tab_switch', 'Excessive Tab Switching', `Switched tabs ${newCount} times`, 'high');
+        return 0; // Reset flag count after converting to violation
+      }
+      
+      return newCount;
+    });
+  }, [toast, maxFlags]);
+
+  const triggerViolation = useCallback((type: ViolationType, reason: string, details?: string, severity: 'low' | 'medium' | 'high' = 'medium') => {
+    if (isDisabledRef.current) return;
+
+    const timestamp = Date.now();
+    const record: ViolationRecord = { type, reason, timestamp, details, severity };
 
     setViolationRecords(prev => {
       const updated = [...prev, record];
@@ -45,7 +98,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
       if (updated.length >= maxViolationsRef.current) {
         isDisabledRef.current = true;
         setTimeout(() => {
-          onViolationRef.current(`Exceeded maximum violations (${maxViolationsRef.current}).`, updated);
+          onViolationRef.current(`Exceeded maximum violations (${maxViolationsRef.current}).`, updated, flagRecords);
         }, 0);
       }
       
@@ -67,12 +120,13 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     });
   }, [toast]);
 
-  // 1. Detect browser/tab changes
+  // 1. Detect browser/tab changes - COUNT AS FLAG, NOT VIOLATION
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'hidden' && !isDisabledRef.current) {
-      triggerViolation('browser_change', 'Browser/Tab Changed', 'You must stay on the quiz tab.');
+      // Tab switch is a flag, not immediate violation
+      triggerFlag('tab_switch', 'Tab Switch Detected');
     }
-  }, [triggerViolation]);
+  }, [triggerFlag]);
 
   // 2. Detect screenshots
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -499,11 +553,11 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     // 4. Monitor fullscreen exit attempts
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && !isDisabledRef.current) {
-        // User exited fullscreen - try to re-enter
+        // User exited fullscreen - count as flag
         setTimeout(() => {
           if (!isDisabledRef.current) {
             enterFullscreen();
-            triggerViolation('browser_change', 'Fullscreen Exit Attempt', 'You must stay in fullscreen mode.');
+            triggerFlag('focus_loss', 'Fullscreen Exit Detected');
           }
         }, 100);
       }
@@ -590,5 +644,10 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAnt
     };
   }, [enabled, handleVisibilityChange, handleContextMenu, handleKeyDown, detectAutomation]);
 
-  return { violationCount, violationRecords };
+  return { 
+    violationCount, 
+    violationRecords, 
+    flagCount, 
+    flagRecords 
+  };
 }
