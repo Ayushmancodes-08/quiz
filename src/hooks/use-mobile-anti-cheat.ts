@@ -168,41 +168,41 @@ export function useMobileAntiCheat({
     }
   }, [triggerViolation]);
 
-  // Detect AI extensions (SIMPLIFIED for mobile - no automation checks)
-  const detectAI = useCallback(() => {
+  // Circle to Search detection ONLY for mobile
+  const detectCircleToSearch = useCallback(() => {
     if (isDisabledRef.current) return;
 
-    // ONLY check for AI extensions, NOT automation/headless browsers
-    // Automation checks cause false positives on mobile browsers
-    const aiIndicators = [
-      'comet',
-      'chatgpt',
-      'claude',
-      'gemini',
-      'copilot',
+    // MOBILE ONLY: Detect Circle to Search (Google Lens)
+    // Check for Google Lens API indicators
+    const lensIndicators = [
+      'lens',
+      'google-lens',
+      'circle-to-search',
     ];
 
-    // Check window properties for AI extensions ONLY
-    for (const indicator of aiIndicators) {
+    // Check window properties for Lens
+    for (const indicator of lensIndicators) {
       if ((window as any)[indicator] || (window as any)[`__${indicator}`]) {
-        triggerViolation('ai_detected', `AI Assistant Detected: ${indicator}`);
+        triggerViolation('ai_detected', `Circle to Search Detected: ${indicator}`);
         return;
       }
     }
 
-    // Check for injected AI elements ONLY
-    const suspiciousElements = document.querySelectorAll(
-      '[class*="ai-"], [id*="ai-"], [class*="comet"], [id*="comet"]'
+    // Check for Lens-injected elements
+    const lensElements = document.querySelectorAll(
+      '[class*="lens"], [id*="lens"], [class*="circle-to-search"]'
     );
-    if (suspiciousElements.length > 0) {
-      triggerViolation('ai_detected', 'AI Extension UI Detected');
+    if (lensElements.length > 0) {
+      triggerViolation('ai_detected', 'Circle to Search UI Detected');
     }
 
-    // DO NOT check for:
-    // - navigator.webdriver (false positive on some mobile browsers)
+    // MOBILE ANTI-CHEAT: DO NOT CHECK FOR:
+    // - navigator.webdriver (false positive on mobile browsers)
     // - navigator.plugins (mobile browsers often have 0 plugins)
     // - screen dimensions (varies on mobile)
     // - automation properties (not relevant on mobile)
+    // - AI extensions (ChatGPT, Claude, etc. - not common on mobile)
+    // - headless browser indicators (causes false positives)
   }, [triggerViolation]);
 
   // Tab switch detection with heavy debouncing for mobile
@@ -258,9 +258,9 @@ export function useMobileAntiCheat({
     // Add keyboard listener for screenshot detection
     window.addEventListener('keydown', handleKeyDown);
 
-    // Check for AI every 10 seconds
-    const aiCheckInterval = setInterval(detectAI, 10000);
-    detectAI(); // Check immediately
+    // Check for Circle to Search every 15 seconds (less frequent on mobile)
+    const circleToSearchInterval = setInterval(detectCircleToSearch, 15000);
+    detectCircleToSearch(); // Check immediately
 
     // Disable context menu (prevents some screenshot methods)
     const handleContextMenu = (e: MouseEvent) => {
@@ -275,13 +275,13 @@ export function useMobileAntiCheat({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('keydown', handleKeyDown);
-      clearInterval(aiCheckInterval);
+      clearInterval(circleToSearchInterval);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.body.style.userSelect = 'auto';
       document.body.style.webkitUserSelect = 'auto';
       isDisabledRef.current = false;
     };
-  }, [enabled, handleKeyDown, detectAI, handleVisibilityChange]);
+  }, [enabled, handleKeyDown, detectCircleToSearch, handleVisibilityChange]);
 
   return {
     violationCount,

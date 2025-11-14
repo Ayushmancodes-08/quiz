@@ -41,12 +41,17 @@ export function detectAutomation(): boolean {
     }
   }
 
-  // Check for headless browser
-  if (
-    /HeadlessChrome/.test(navigator.userAgent) ||
-    navigator.plugins.length === 0
-  ) {
-    return true;
+  // Check for headless browser (ONLY on desktop, not mobile)
+  // Mobile browsers often have 0 plugins, which causes false positives
+  const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (!isMobile) {
+    if (
+      /HeadlessChrome/.test(navigator.userAgent) ||
+      navigator.plugins.length === 0
+    ) {
+      return true;
+    }
   }
 
   return false;

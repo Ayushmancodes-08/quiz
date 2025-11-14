@@ -157,12 +157,16 @@ export function AntiScreenshot({
         handleViolation('bot_detected');
       }
 
-      // Check for headless browser
-      if (
-        /HeadlessChrome/.test(navigator.userAgent) ||
-        navigator.plugins.length === 0
-      ) {
-        handleViolation('headless_browser');
+      // Check for headless browser (ONLY on desktop - mobile browsers often have 0 plugins)
+      const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (!isMobile) {
+        if (
+          /HeadlessChrome/.test(navigator.userAgent) ||
+          navigator.plugins.length === 0
+        ) {
+          handleViolation('headless_browser');
+        }
       }
     };
 

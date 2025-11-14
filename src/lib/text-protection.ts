@@ -252,18 +252,22 @@ export function textToImageDataURL(
 
 /**
  * Detect if AI is trying to read the page
+ * MOBILE-SAFE: Excludes checks that cause false positives on mobile browsers
  */
 export function detectAIReading(): boolean {
+  // Detect if mobile device
+  const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
   // Check for common AI scraping indicators
   const indicators = [
-    // Check for headless browser
-    !navigator.plugins || navigator.plugins.length === 0,
+    // Check for headless browser (ONLY on desktop - mobile browsers often have 0 plugins)
+    !isMobile && (!navigator.plugins || navigator.plugins.length === 0),
     // Check for automation
     (window as any).navigator?.webdriver === true,
     // Check for missing properties
     !navigator.languages || navigator.languages.length === 0,
-    // Check for unusual screen size
-    screen.width === 0 || screen.height === 0,
+    // Check for unusual screen size (ONLY on desktop - mobile screens vary widely)
+    !isMobile && (screen.width === 0 || screen.height === 0),
   ];
 
   return indicators.filter(Boolean).length >= 2;
