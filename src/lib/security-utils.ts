@@ -44,7 +44,7 @@ export function detectAutomation(): boolean {
   // Check for headless browser (ONLY on desktop, not mobile)
   // Mobile browsers often have 0 plugins, which causes false positives
   const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
+
   if (!isMobile) {
     if (
       /HeadlessChrome/.test(navigator.userAgent) ||
@@ -127,7 +127,8 @@ export async function checkViolationThreshold(
 export function preventSelection(element: HTMLElement): void {
   element.style.userSelect = 'none';
   element.style.webkitUserSelect = 'none';
-  element.style.msUserSelect = 'none';
+  // msUserSelect is deprecated and removed from types
+  // element.style.msUserSelect = 'none';
 }
 
 /**
@@ -167,7 +168,7 @@ export function detectDevTools(): boolean {
   const threshold = 160;
   const widthThreshold = window.outerWidth - window.innerWidth > threshold;
   const heightThreshold = window.outerHeight - window.innerHeight > threshold;
-  
+
   return widthThreshold || heightThreshold;
 }
 

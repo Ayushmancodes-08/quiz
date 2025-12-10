@@ -9,6 +9,7 @@ import { PerformanceTrendChart } from './performance-trend-chart';
 import { StudentStatistics } from './student-statistics';
 import { QuizBreakdown } from './quiz-breakdown';
 import { StudentsByQuiz } from './students-by-quiz';
+import { DetailedResultsTable } from './detailed-results-table';
 import { summarizeResultsAction } from '@/lib/actions';
 import { Loader2, TriangleAlert } from 'lucide-react';
 import { useUser, WithId } from '@/supabase';
@@ -54,12 +55,12 @@ export function ResultsDashboard() {
   }, [attempts]);
 
   const recentAttempts = (attempts as WithId<QuizAttempt>[]) || [];
-  
+
   if (queryError) {
-    const isPermissionError = queryError.message?.includes('permission') || 
-                             queryError.message?.includes('Permission') ||
-                             (queryError as any).code === 'permission-denied';
-    
+    const isPermissionError = queryError.message?.includes('permission') ||
+      queryError.message?.includes('Permission') ||
+      (queryError as any).code === 'permission-denied';
+
     return (
       <Card>
         <CardHeader>
@@ -68,7 +69,7 @@ export function ResultsDashboard() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-muted-foreground">
-              {isPermissionError 
+              {isPermissionError
                 ? "Unable to load quiz attempts due to permission restrictions. Please check your Supabase RLS policies."
                 : `Error loading quiz attempts: ${queryError.message}`}
             </p>
@@ -88,7 +89,7 @@ export function ResultsDashboard() {
       </Card>
     );
   }
-  
+
   if (areAttemptsLoading && !attempts) {
     return (
       <div className="flex h-60 items-center justify-center">
@@ -100,14 +101,14 @@ export function ResultsDashboard() {
 
   if (!areAttemptsLoading && (!recentAttempts || recentAttempts.length === 0)) {
     return (
-         <Card>
-            <CardHeader>
-                <CardTitle className="font-headline text-glow-primary">Results Dashboard</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p className="py-8 text-center text-muted-foreground">No one has taken your quizzes yet. Share a quiz link to get started!</p>
-            </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-glow-primary">Results Dashboard</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="py-8 text-center text-muted-foreground">No one has taken your quizzes yet. Share a quiz link to get started!</p>
+        </CardContent>
+      </Card>
     )
   }
 
@@ -143,9 +144,9 @@ export function ResultsDashboard() {
           </CardHeader>
           <CardContent>
             {areAttemptsLoading ? (
-               <div className="flex h-[250px] items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-               </div>
+              <div className="flex h-[250px] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
             ) : (
               <ScoreDistributionChart data={recentAttempts} />
             )}
@@ -170,6 +171,25 @@ export function ResultsDashboard() {
       {!areAttemptsLoading && recentAttempts.length > 0 && (
         <QuizBreakdown attempts={recentAttempts} />
       )}
+
+      {/* Detailed Results Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-glow-primary">Recent Activity</CardTitle>
+          <CardDescription>
+            A detailed log of all recent quiz attempts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {areAttemptsLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <DetailedResultsTable attempts={recentAttempts} />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Students Grouped by Quiz */}
       <Card>

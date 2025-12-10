@@ -16,14 +16,14 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      const supabase = await createClient();
-      
+      const supabase: any = await createClient();
+
       // Get current user (optional - works without auth)
       const { data: { user } } = await supabase.auth.getUser();
 
       // Try to log security violation to database
       const { error } = await supabase
-        .from('security_logs')
+        .from('security_logs' as any)
         .insert({
           user_id: user?.id || null,
           violation_type: type,
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
           if (recentViolations && recentViolations.length > 10) {
             // Too many violations - could trigger account suspension
-            return NextResponse.json({ 
+            return NextResponse.json({
               warning: 'Too many security violations',
               action: 'account_review_required'
             }, { status: 429 });

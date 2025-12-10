@@ -13,26 +13,17 @@ export interface ViolationRecord {
   severity?: 'low' | 'medium' | 'high';
 }
 
-export interface FlagRecord {
-  type: 'tab_switch' | 'focus_loss' | 'suspicious_activity';
-  reason: string;
-  timestamp: number;
-  count: number;
-}
-
 type UseAntiCheatProps = {
   enabled: boolean;
-  onViolation: (reason: string, violationRecords?: ViolationRecord[], flags?: FlagRecord[]) => void;
-  maxViolations?: number;
-  maxFlags?: number; // Tab switches before violation
+  onViolation: (reason: string, violationRecords?: ViolationRecord[]) => void;
+  maxViolations?: number; // Violation limit per category
 };
 
-export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags = 5 }: UseAntiCheatProps) {
+export function useAntiCheat({ enabled, onViolation, maxViolations = 3 }: UseAntiCheatProps) {
   const { toast } = useToast();
-  const [violationCount, setViolationCount] = useState(0);
   const [violationRecords, setViolationRecords] = useState<ViolationRecord[]>([]);
-  const [flagCount, setFlagCount] = useState(0);
-  const [flagRecords, setFlagRecords] = useState<FlagRecord[]>([]);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [securityViolationCount, setSecurityViolationCount] = useState(0);
   const isDisabledRef = useRef(false);
   const automationCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -44,48 +35,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     maxViolationsRef.current = maxViolations;
   }, [onViolation, maxViolations]);
 
-  const triggerFlag = useCallback((type: FlagRecord['type'], reason: string) => {
-    if (isDisabledRef.current) return;
-
-    const timestamp = Date.now();
-    
-    setFlagRecords(prev => {
-      const existingFlag = prev.find(f => f.type === type);
-      if (existingFlag) {
-        // Increment existing flag count
-        return prev.map(f => 
-          f.type === type 
-            ? { ...f, count: f.count + 1, timestamp }
-            : f
-        );
-      } else {
-        // Add new flag
-        return [...prev, { type, reason, timestamp, count: 1 }];
-      }
-    });
-
-    setFlagCount(prev => {
-      const newCount = prev + 1;
-      
-      // Show warning toast
-      setTimeout(() => {
-        toast({
-          variant: 'default',
-          title: `⚠️ Warning: ${reason}`,
-          description: `Flag ${newCount}/${maxFlags}. ${maxFlags - newCount} warnings remaining before violation.`,
-        });
-      }, 0);
-
-      // Convert to violation if max flags reached
-      if (newCount >= maxFlags) {
-        triggerViolation('tab_switch', 'Excessive Tab Switching', `Switched tabs ${newCount} times`, 'high');
-        return 0; // Reset flag count after converting to violation
-      }
-      
-      return newCount;
-    });
-  }, [toast, maxFlags]);
-
+  // Combined trigger for all violations
   const triggerViolation = useCallback((type: ViolationType, reason: string, details?: string, severity: 'low' | 'medium' | 'high' = 'medium') => {
     if (isDisabledRef.current) return;
 
@@ -94,31 +44,43 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
 
     setViolationRecords(prev => {
       const updated = [...prev, record];
-      
-      if (updated.length >= maxViolationsRef.current) {
+
+      // Calculate counts from updated records
+      const tabs = updated.filter(r => r.type === 'tab_switch' || r.type === 'browser_change').length;
+      const security = updated.filter(r => r.type !== 'tab_switch' && r.type !== 'browser_change').length;
+
+      setTabSwitchCount(tabs);
+      setSecurityViolationCount(security);
+
+      // Check if ANY category hit the limit
+      if (tabs >= maxViolationsRef.current || security >= maxViolationsRef.current) {
         isDisabledRef.current = true;
         setTimeout(() => {
-          onViolationRef.current(`Exceeded maximum violations (${maxViolationsRef.current}).`, updated, flagRecords);
+          onViolationRef.current(`Exceeded maximum violations (${maxViolationsRef.current}) in a category.`, updated);
         }, 0);
       }
-      
+
       return updated;
     });
-    
-    setViolationCount(prev => {
-      const newCount = prev + 1;
-      
-      setTimeout(() => {
+
+    // Toast notification
+    setTimeout(() => {
+      if (type === 'tab_switch' || type === 'browser_change') {
         toast({
           variant: 'destructive',
-          title: `Violation Detected: ${reason}`,
-          description: `${details || reason} (${newCount}/${maxViolationsRef.current} violations).`,
+          title: `Violation: ${reason}`,
+          description: `Tab Violations: ${tabSwitchCount + 1}/${maxViolationsRef.current}`,
         });
-      }, 0);
-      
-      return newCount;
-    });
-  }, [toast]);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: `Security Violation: ${reason}`,
+          description: `Security Violations: ${securityViolationCount + 1}/${maxViolationsRef.current}`,
+        });
+      }
+    }, 0);
+
+  }, [toast, tabSwitchCount, securityViolationCount]);
 
   // Detect if device is mobile
   const isMobile = useRef(false);
@@ -132,7 +94,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     isMobile.current = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
       ('ontouchstart' in window) ||
       (navigator.maxTouchPoints > 0);
-    
+
     console.log('Device type:', isMobile.current ? 'Mobile' : 'Desktop');
   }, []);
 
@@ -143,35 +105,36 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
       console.log('Visibility monitoring disabled on mobile');
       return;
     }
-    
+
     // Only monitor if enough time has passed since monitoring started (5 second grace period)
     if (!isMonitoringActive.current) {
       console.log('Monitoring not active yet - grace period');
       return;
     }
-    
+
     const timeSinceStart = Date.now() - monitoringStartTime.current;
     if (timeSinceStart < 5000) {
       console.log('Within grace period - ignoring visibility change');
       return;
     }
-    
+
     if (document.visibilityState === 'hidden' && !isDisabledRef.current) {
       const now = Date.now();
       const timeSinceLastChange = now - lastVisibilityChange.current;
-      
+
       // Reset count if more than 10 seconds since last change
       if (timeSinceLastChange > 10000) {
         visibilityChangeCount.current = 0;
       }
-      
+
       visibilityChangeCount.current++;
       lastVisibilityChange.current = now;
-      
-      // Tab switch is a flag, not immediate violation
-      triggerFlag('tab_switch', 'Tab Switch Detected');
+
+
+      // Direct violation for tab switching
+      triggerViolation('tab_switch', 'Tab Switch Detected', 'Leaving the quiz tab is not allowed.');
     }
-  }, [triggerFlag]);
+  }, [triggerViolation]);
 
   // 2. Detect screenshots
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -185,18 +148,18 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     }
 
     // Windows screenshot shortcuts: Win+Shift+S, Win+PrintScreen
-    const isWindowsKey = navigator.platform.includes('Win') && 
+    const isWindowsKey = navigator.platform.includes('Win') &&
       (e.getModifierState('Meta') || (e.key === 's' && e.shiftKey));
-    
+
     if (isWindowsKey && e.shiftKey && e.key === 's') {
       e.preventDefault();
       triggerViolation('screenshot', 'Screenshot Attempt', 'Windows screenshot shortcut (Win+Shift+S) is disabled.');
       return;
     }
-    
+
     // Windows key + PrintScreen
-    if (navigator.platform.includes('Win') && e.key === 'PrintScreen' && 
-        (e.getModifierState('Meta') || e.getModifierState('OS'))) {
+    if (navigator.platform.includes('Win') && e.key === 'PrintScreen' &&
+      (e.getModifierState('Meta') || e.getModifierState('OS'))) {
       e.preventDefault();
       triggerViolation('screenshot', 'Screenshot Attempt', 'Windows screenshot shortcut (Win+PrintScreen) is disabled.');
       return;
@@ -213,17 +176,17 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
   // We'll detect it through image search APIs and context menu on images
   const handleContextMenu = useCallback((e: MouseEvent) => {
     const target = e.target as HTMLElement;
-    
+
     // Check if right-click is on an image or element that might trigger Circle to Search
     if (target.tagName === 'IMG' || target.closest('img')) {
       e.preventDefault();
       triggerViolation('circle_to_search', 'Circle to Search Detected', 'Circle to Search (Google Lens) is disabled during the quiz.');
       return;
     }
-    
+
     // Also check for other image-related elements
-    if (target.tagName === 'SVG' || target.closest('svg') || 
-        target.tagName === 'CANVAS' || target.closest('canvas')) {
+    if (target.tagName === 'SVG' || target.closest('svg') ||
+      target.tagName === 'CANVAS' || target.closest('canvas')) {
       e.preventDefault();
       triggerViolation('circle_to_search', 'Circle to Search Detected', 'Circle to Search (Google Lens) is disabled during the quiz.');
     }
@@ -237,7 +200,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     let suspicionScore = 0; // Track suspicious behavior
 
     // === AI Browser Extension Detection ===
-    
+
     // Check for common AI extension properties
     const aiExtensionIndicators = [
       'comet',
@@ -290,8 +253,8 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
               const element = node as Element;
               const className = element.className?.toString().toLowerCase() || '';
               const id = element.id?.toLowerCase() || '';
-              
-              if (aiExtensionIndicators.some(indicator => 
+
+              if (aiExtensionIndicators.some(indicator =>
                 className.includes(indicator) || id.includes(indicator)
               )) {
                 checks.push('AI extension content injection detected');
@@ -308,7 +271,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
       // Try to detect if extensions are actively communicating
       try {
         const originalSendMessage = (window as any).chrome.runtime.sendMessage;
-        (window as any).chrome.runtime.sendMessage = function(...args: any[]) {
+        (window as any).chrome.runtime.sendMessage = function (...args: any[]) {
           checks.push('Extension communication detected');
           suspicionScore += 5;
           return originalSendMessage.apply(this, args);
@@ -319,17 +282,17 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     }
 
     // === Behavioral Analysis ===
-    
+
     // Check for suspiciously fast answer times (AI assistance indicator)
     const answerTimes: number[] = [];
     let lastAnswerTime = Date.now();
-    
+
     document.addEventListener('change', () => {
       const currentTime = Date.now();
       const timeDiff = currentTime - lastAnswerTime;
       answerTimes.push(timeDiff);
       lastAnswerTime = currentTime;
-      
+
       // If answering too quickly consistently (< 5 seconds), might be using AI
       if (answerTimes.length >= 3) {
         const avgTime = answerTimes.reduce((a, b) => a + b, 0) / answerTimes.length;
@@ -341,7 +304,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     });
 
     // === Traditional Automation Detection ===
-    
+
     // Check for WebDriver property (Selenium, Puppeteer, Playwright)
     if ((window as any).navigator?.webdriver === true) {
       checks.push('WebDriver detected');
@@ -432,12 +395,12 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     // === Realistic Violation Triggering ===
     // Only trigger violation if suspicion score is high enough
     // This prevents false positives from legitimate browser variations
-    
+
     if (suspicionScore >= 10) {
       const severity = suspicionScore >= 20 ? 'High' : suspicionScore >= 15 ? 'Medium' : 'Low';
       triggerViolation(
-        'ai_agent', 
-        'AI Assistant/Automation Detected', 
+        'ai_agent',
+        'AI Assistant/Automation Detected',
         `Detected: ${checks.join(', ')} | Severity: ${severity} (Score: ${suspicionScore})`
       );
     }
@@ -451,18 +414,18 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
     const originalToBlob = HTMLCanvasElement.prototype.toBlob;
     const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData;
-    
-    HTMLCanvasElement.prototype.toDataURL = function(...args: any[]) {
+
+    HTMLCanvasElement.prototype.toDataURL = function (...args: any[]) {
       triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas export is disabled (possible screenshot tool).');
       return '';
     };
-    
-    HTMLCanvasElement.prototype.toBlob = function(...args: any[]) {
+
+    HTMLCanvasElement.prototype.toBlob = function (...args: any[]) {
       triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas export is disabled (possible screenshot tool).');
       if (args[0]) args[0](null);
     };
-    
-    CanvasRenderingContext2D.prototype.getImageData = function(...args: any[]) {
+
+    CanvasRenderingContext2D.prototype.getImageData = function (...args: any[]) {
       triggerViolation('screenshot', 'Screenshot Attempt', 'Canvas image data access is disabled (possible screenshot tool).');
       return new ImageData(1, 1);
     };
@@ -470,17 +433,17 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     // Detect Circle to Search through image search APIs
     // Override fetch to detect image search and AI API requests
     const originalFetch = window.fetch;
-    window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
+    window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
       const url = input.toString().toLowerCase();
-      
+
       // Detect image search
-      if (url.includes('lens.google.com') || 
-          url.includes('google.com/searchbyimage') ||
-          url.includes('reverse-image-search') ||
-          (url.includes('google.com') && url.includes('image'))) {
+      if (url.includes('lens.google.com') ||
+        url.includes('google.com/searchbyimage') ||
+        url.includes('reverse-image-search') ||
+        (url.includes('google.com') && url.includes('image'))) {
         triggerViolation('circle_to_search', 'Circle to Search Detected', 'Image search detected (Circle to Search).');
       }
-      
+
       // Detect AI API calls
       const aiApiDomains = [
         'openai.com',
@@ -494,18 +457,18 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
         'api.together.xyz',
         'api.replicate.com',
       ];
-      
+
       if (aiApiDomains.some(domain => url.includes(domain))) {
         triggerViolation('ai_agent', 'AI API Request Detected', `External AI service call detected: ${url.split('/')[2]}`);
       }
-      
+
       return originalFetch.call(this, input, init);
     };
 
     // Monitor clipboard for suspicious paste activity
     const handlePaste = async (e: ClipboardEvent) => {
       const pastedText = e.clipboardData?.getData('text');
-      
+
       if (pastedText && pastedText.length > 50) {
         // Long paste might indicate copying from AI
         triggerViolation('ai_agent', 'Suspicious Paste Detected', `Large text paste detected (${pastedText.length} characters). Possible AI-generated content.`);
@@ -540,7 +503,8 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
 
     // Reset state when enabled
     isDisabledRef.current = false;
-    setViolationCount(0);
+    setTabSwitchCount(0);
+    setSecurityViolationCount(0);
     setViolationRecords([]);
 
     // Run automation detection immediately and periodically
@@ -560,7 +524,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
         console.log('Skipping fullscreen on mobile device');
         return;
       }
-      
+
       try {
         await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
         console.log('Fullscreen mode activated');
@@ -576,7 +540,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
         console.log('Skipping keyboard lock on mobile device');
         return;
       }
-      
+
       try {
         if ('keyboard' in navigator && 'lock' in (navigator as any).keyboard) {
           await (navigator as any).keyboard.lock([
@@ -599,7 +563,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
         if ('wakeLock' in navigator) {
           wakeLock = await (navigator as any).wakeLock.request('screen');
           console.log('Wake lock activated');
-          
+
           wakeLock.addEventListener('release', () => {
             console.log('Wake lock released');
           });
@@ -613,13 +577,13 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     const handleFullscreenChange = () => {
       // Skip fullscreen monitoring on mobile
       if (isMobile.current) return;
-      
+
       if (!document.fullscreenElement && !isDisabledRef.current) {
         // User exited fullscreen - count as flag
         setTimeout(() => {
           if (!isDisabledRef.current) {
             enterFullscreen();
-            triggerFlag('focus_loss', 'Fullscreen Exit Detected');
+            triggerViolation('tab_switch', 'Fullscreen Exit', 'Exiting fullscreen is treated as a tab violation.');
           }
         }, 100);
       }
@@ -634,7 +598,7 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
 
     // Add event listeners with startup delay
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    
+
     // IMPORTANT: Add visibility listener ONLY on desktop
     if (!isMobile.current) {
       document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -642,20 +606,20 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
     } else {
       console.log('Visibility monitoring DISABLED (Mobile)');
     }
-    
+
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('keydown', handleKeyDown);
-    
+
     // Activate monitoring after 5 second grace period
     setTimeout(() => {
       monitoringStartTime.current = Date.now();
       isMonitoringActive.current = true;
       console.log('Anti-cheat monitoring now active');
     }, 5000);
-    
+
     // Disable text selection
     document.body.style.userSelect = 'none';
-    
+
     // Disable drag and drop
     document.body.addEventListener('dragstart', (e) => e.preventDefault());
     document.body.addEventListener('drop', (e) => e.preventDefault());
@@ -698,40 +662,39 @@ export function useAntiCheat({ enabled, onViolation, maxViolations = 3, maxFlags
         clearInterval(automationCheckIntervalRef.current);
         automationCheckIntervalRef.current = null;
       }
-      
+
       // Release all locks
       if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
+        document.exitFullscreen().catch(() => { });
       }
       if ('keyboard' in navigator && 'unlock' in (navigator as any).keyboard) {
         (navigator as any).keyboard.unlock();
       }
       if (wakeLock) {
-        wakeLock.release().catch(() => {});
+        wakeLock.release().catch(() => { });
       }
 
       // Remove event listeners
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      
+
       // Only remove visibility listener if it was added (desktop only)
       if (!isMobile.current) {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
-      
+
       document.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keydown', blockExitShortcuts);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      
+
       document.body.style.userSelect = 'auto';
       isDisabledRef.current = false;
     };
   }, [enabled, handleVisibilityChange, handleContextMenu, handleKeyDown, detectAutomation]);
 
-  return { 
-    violationCount, 
-    violationRecords, 
-    flagCount, 
-    flagRecords 
+  return {
+    violationRecords,
+    tabSwitchCount,
+    securityViolationCount
   };
 }

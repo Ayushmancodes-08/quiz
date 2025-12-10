@@ -125,7 +125,7 @@ export default function QuizReviewPage() {
     );
   }
 
-  const correctCount = quiz.questions.filter((q, index) => 
+  const correctCount = quiz.questions.filter((q, index) =>
     attempt.answers[index] === q.correctAnswer
   ).length;
 
@@ -218,15 +218,15 @@ export default function QuizReviewPage() {
         {/* Questions Review */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Question by Question Review</h2>
-          
+
           {quiz.questions.map((question, index) => {
             const userAnswer = attempt.answers[index];
             const isCorrect = userAnswer === question.correctAnswer;
-            const allOptions = [question.correctAnswer, ...question.options];
+            const allOptions = Array.from(new Set([question.correctAnswer, ...question.options]));
 
             return (
-              <Card 
-                key={index} 
+              <Card
+                key={index}
                 className={cn(
                   "shadow-md transition-all",
                   isCorrect ? "border-green-500/50 bg-green-500/5" : "border-red-500/50 bg-red-500/5"
@@ -325,27 +325,27 @@ export default function QuizReviewPage() {
           <CardContent className="pt-6 space-y-4">
             <div className="text-center space-y-2">
               <p className="text-lg font-semibold">
-                {percentage >= 80 ? "🎉 Excellent Work!" : 
-                 percentage >= 60 ? "👍 Good Job!" : 
-                 "💪 Keep Practicing!"}
+                {percentage >= 80 ? "🎉 Excellent Work!" :
+                  percentage >= 60 ? "👍 Good Job!" :
+                    "💪 Keep Practicing!"}
               </p>
               <p className="text-sm text-muted-foreground">
-                {percentage >= 80 ? "You've mastered this topic!" : 
-                 percentage >= 60 ? "You're on the right track!" : 
-                 "Review the questions and try again!"}
+                {percentage >= 80 ? "You've mastered this topic!" :
+                  percentage >= 60 ? "You're on the right track!" :
+                    "Review the questions and try again!"}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
-                onClick={() => router.push('/')} 
+              <Button
+                onClick={() => router.push('/')}
                 variant="outline"
                 className="flex-1"
               >
                 <Home className="mr-2 h-4 w-4" />
                 Return to Home
               </Button>
-              <Button 
-                onClick={() => router.push(`/quiz/${quiz.id}`)} 
+              <Button
+                onClick={() => router.push(`/quiz/${quiz.id}`)}
                 className="flex-1"
               >
                 Retake Quiz

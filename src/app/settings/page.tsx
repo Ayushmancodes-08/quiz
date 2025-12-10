@@ -13,7 +13,7 @@ import { Loader2, Save, User, Image as ImageIcon, ArrowLeft } from 'lucide-react
 
 export default function SettingsPage() {
   const { user } = useUser();
-  const supabase = useSupabaseClient();
+  const supabase: any = useSupabaseClient();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -45,7 +45,7 @@ export default function SettingsPage() {
       if (error) throw error;
 
       await supabase
-        .from('user_profiles')
+        .from('user_profiles' as any)
         .update({
           display_name: displayName,
         } as any)
@@ -118,7 +118,7 @@ export default function SettingsPage() {
               <Avatar className="h-24 w-24">
                 <AvatarImage src={avatarUrl || undefined} alt={displayName} />
                 <AvatarFallback className="text-2xl">
-                  {getInitials(displayName)}
+                  <span>{getInitials(displayName)}</span>
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">

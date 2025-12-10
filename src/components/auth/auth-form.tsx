@@ -18,7 +18,7 @@ const loginSchema = z.object({
 });
 
 const signupSchema = z.object({
-  displayName: z.string().min(2, { message: "Name must be at least 2 characters long."}),
+  displayName: z.string().min(2, { message: "Name must be at least 2 characters long." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters long." }),
 });
@@ -69,7 +69,7 @@ export default function AuthForm() {
     try {
       await signInWithGoogle();
     } catch (error: any) {
-       toast({
+      toast({
         variant: "destructive",
         title: "Google Sign-In Failed",
         description: error.message || "Could not sign in with Google.",
@@ -94,7 +94,7 @@ export default function AuthForm() {
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-4">
             {!isLogin && (
-               <div className="grid gap-2">
+              <div className="grid gap-2">
                 <Label htmlFor="displayName">Display Name</Label>
                 <Input
                   id="displayName"
@@ -106,7 +106,7 @@ export default function AuthForm() {
                   disabled={loading}
                   {...register("displayName")}
                 />
-                {errors?.displayName && (
+                {(errors as any)?.displayName && (
                   <p className="px-1 text-xs text-destructive">{(errors as any).displayName.message}</p>
                 )}
               </div>
@@ -136,7 +136,7 @@ export default function AuthForm() {
                 disabled={loading}
                 {...register("password")}
               />
-               {errors?.password && (
+              {errors?.password && (
                 <p className="px-1 text-xs text-destructive">{errors.password.message}</p>
               )}
             </div>

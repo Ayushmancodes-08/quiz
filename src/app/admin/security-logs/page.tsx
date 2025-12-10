@@ -12,10 +12,10 @@ export default async function SecurityLogsPage() {
 
   try {
     const supabase = await createClient();
-    
+
     const { data: { user: authUser } } = await supabase.auth.getUser();
     user = authUser;
-    
+
     // Uncomment when you want to require authentication
     // if (!user) {
     //   redirect('/login');
@@ -96,7 +96,7 @@ export default async function SecurityLogsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              {logs?.filter(l => 
+              {logs?.filter(l =>
                 new Date(l.timestamp) > new Date(Date.now() - 86400000)
               ).length || 0}
             </p>
@@ -117,7 +117,7 @@ export default async function SecurityLogsPage() {
                 <p className="text-xs text-muted-foreground mb-1 capitalize">
                   {type.replace(/_/g, ' ')}
                 </p>
-                <p className="text-2xl font-bold">{count}</p>
+                <p className="text-2xl font-bold">{String(count)}</p>
               </div>
             ))}
           </div>

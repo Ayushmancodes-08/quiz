@@ -1,0 +1,8 @@
+﻿
+> nextn@0.1.0 lint
+> next lint
+
+? How would you like to configure ESLint? https://nextjs.org/docs/app/api-reference/config/eslint
+[?25lΓ¥»  Strict (recommended)
+   Base
+   Cancel[2K[1A[2K[1A[2K[G[?25h

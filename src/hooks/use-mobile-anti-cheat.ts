@@ -22,17 +22,17 @@ type UseMobileAntiCheatProps = {
   maxFlags?: number;
 };
 
-export function useMobileAntiCheat({ 
-  enabled, 
-  onViolation, 
+export function useMobileAntiCheat({
+  enabled,
+  onViolation,
   maxViolations = 3,
   maxFlags = 3
 }: UseMobileAntiCheatProps) {
   const { toast } = useToast();
   const [violationCount, setViolationCount] = useState(0);
   const [violations, setViolations] = useState<MobileViolationRecord[]>([]);
-  const [flagCount, setFlagCount] = useState(0);
-  const [flags, setFlags] = useState<MobileFlagRecord[]>([]);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [securityViolationCount, setSecurityViolationCount] = useState(0);
   const [isIncognito, setIsIncognito] = useState<boolean | null>(null);
   const isDisabledRef = useRef(false);
   const lastVisibilityChange = useRef<number>(0);
@@ -46,7 +46,7 @@ export function useMobileAntiCheat({
       if ('storage' in navigator && 'estimate' in navigator.storage) {
         try {
           const estimate = await navigator.storage.estimate();
-          const isLikelyIncognito = estimate.quota && estimate.quota < 120000000; // Less than 120MB
+          const isLikelyIncognito = estimate.quota && estimate.quota < 120000000 ? true : false;
           setIsIncognito(isLikelyIncognito);
           return;
         } catch (e) {
@@ -70,43 +70,10 @@ export function useMobileAntiCheat({
     detectIncognito();
   }, []);
 
+  // Flag logic removed - redirect to violation
   const triggerFlag = useCallback((reason: string) => {
-    if (isDisabledRef.current) return;
-
-    const timestamp = Date.now();
-    
-    setFlags(prev => {
-      const existing = prev.find(f => f.type === 'tab_switch');
-      if (existing) {
-        return prev.map(f => 
-          f.type === 'tab_switch' 
-            ? { ...f, count: f.count + 1, timestamp }
-            : f
-        );
-      } else {
-        return [...prev, { type: 'tab_switch', count: 1, timestamp }];
-      }
-    });
-
-    setFlagCount(prev => {
-      const newCount = prev + 1;
-      
-      setTimeout(() => {
-        toast({
-          variant: 'default',
-          title: `⚠️ Warning: ${reason}`,
-          description: `Warning ${newCount}/${maxFlags}. ${maxFlags - newCount} remaining before violation.`,
-        });
-      }, 0);
-
-      if (newCount >= maxFlags) {
-        triggerViolation('tab_switch', 'Excessive Tab Switching');
-        return 0; // Reset
-      }
-      
-      return newCount;
-    });
-  }, [toast, maxFlags]);
+    triggerViolation('tab_switch', reason);
+  }, []);
 
   const triggerViolation = useCallback((
     type: MobileViolationRecord['type'],
@@ -122,31 +89,41 @@ export function useMobileAntiCheat({
 
     setViolations(prev => {
       const updated = [...prev, violation];
-      
-      if (updated.length >= maxViolations) {
+
+      const tabs = updated.filter(r => r.type === 'tab_switch').length;
+      const security = updated.filter(r => r.type !== 'tab_switch').length;
+
+      setTabSwitchCount(tabs);
+      setSecurityViolationCount(security);
+
+      if (tabs >= maxViolations || security >= maxViolations) {
         isDisabledRef.current = true;
         setTimeout(() => {
-          onViolation(`Exceeded maximum violations (${maxViolations}).`, updated, flags);
+          onViolation(`Exceeded maximum violations (${maxViolations}).`, updated);
         }, 0);
       }
-      
+
       return updated;
     });
 
-    setViolationCount(prev => {
-      const newCount = prev + 1;
-      
-      setTimeout(() => {
+    // Toast notification
+    setTimeout(() => {
+      if (type === 'tab_switch') {
         toast({
           variant: 'destructive',
-          title: `🚫 Violation: ${reason}`,
-          description: `Violation ${newCount}/${maxViolations}`,
+          title: `Violation: ${reason}`,
+          description: `Tab Violations: ${tabSwitchCount + 1}/${maxViolations}`
         });
-      }, 0);
-      
-      return newCount;
-    });
-  }, [toast, maxViolations, onViolation, flags]);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: `Security Violation: ${reason}`,
+          description: `Security Violations: ${securityViolationCount + 1}/${maxViolations}`
+        });
+      }
+    }, 0);
+
+  }, [toast, maxViolations, onViolation, tabSwitchCount, securityViolationCount]);
 
   // Screenshot detection for mobile
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -155,7 +132,7 @@ export function useMobileAntiCheat({
     // Android screenshot: Power + Volume Down (can't detect directly)
     // iOS screenshot: Power + Home or Power + Volume Up (can't detect directly)
     // But we can detect some keyboard shortcuts if external keyboard is used
-    
+
     if (e.key === 'PrintScreen') {
       e.preventDefault();
       triggerViolation('screenshot', 'Screenshot Attempt Detected');
@@ -211,33 +188,33 @@ export function useMobileAntiCheat({
       const now = Date.now();
       const timeSinceStart = now - monitoringStartTime.current;
       const timeSinceLastChange = now - lastVisibilityChange.current;
-      
+
       // Grace period: Don't monitor for first 10 seconds
       if (timeSinceStart < 10000) {
         console.log('Mobile: Within grace period, ignoring visibility change');
         return;
       }
-      
+
       // Debounce: Ignore rapid changes (< 3 seconds)
       if (timeSinceLastChange < 3000) {
         console.log('Mobile: Rapid change detected, ignoring');
         return;
       }
-      
+
       // Reset count if more than 15 seconds since last change
       if (timeSinceLastChange > 15000) {
         visibilityChangeCount.current = 0;
       }
-      
+
       visibilityChangeCount.current++;
       lastVisibilityChange.current = now;
-      
+
       // First 2 changes are free (keyboard, notifications, etc.)
       if (visibilityChangeCount.current <= 2) {
         console.log(`Mobile: Free visibility change ${visibilityChangeCount.current}/2`);
         return;
       }
-      
+
       // After 2 free changes, start flagging
       triggerFlag('Tab Switch Detected');
     }
@@ -286,8 +263,8 @@ export function useMobileAntiCheat({
   return {
     violationCount,
     violations,
-    flagCount,
-    flags,
+    tabSwitchCount,
+    securityViolationCount,
     isIncognito,
   };
 }

@@ -1,0 +1,21 @@
+﻿
+> nextn@0.1.0 typecheck
+> tsc --noEmit
+
+src/app/admin/security-logs/page.tsx(120,51): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+src/app/api/admin/api-keys/status/route.ts(26,18): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/admin/cleanup/abandoned-attempts/route.ts(26,18): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/admin/cleanup/abandoned-attempts/route.ts(43,51): error TS2345: Argument of type '{ p_performed_by: string; p_operation_type: string; p_records_affected: number; p_config: { gracePeriodHours: any; }; p_result: { details: AbandonedAttempt[]; }; }' is not assignable to parameter of type 'undefined'.
+src/app/api/admin/cleanup/orphaned/route.ts(26,18): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/admin/cleanup/orphaned/route.ts(53,49): error TS2345: Argument of type '{ p_performed_by: string; p_operation_type: string; p_records_affected: number; p_config: {}; p_result: { shuffledQuestionsDeleted: number; studentAnswersDeleted: number; }; }' is not assignable to parameter of type 'undefined'.
+src/app/api/admin/cleanup/violations/route.ts(26,18): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/admin/cleanup/violations/route.ts(51,51): error TS2345: Argument of type '{ p_performed_by: string; p_operation_type: string; p_records_affected: number; p_config: { retentionDays: any; archiveBeforeDelete: boolean; }; p_result: { violationsArchived: number; violationsDeleted: number; }; }' is not assignable to parameter of type 'undefined'.
+src/app/settings/page.tsx(49,17): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/auth/auth-form.tsx(109,26): error TS2339: Property 'displayName' does not exist on type 'FieldErrors<{ email: string; password: string; } | { email: string; password: string; displayName: string; }>'.
+  Property 'displayName' does not exist on type 'Partial<FieldErrorsImpl<{ email: string; password: string; }>> & { root?: (Record<string, Partial<{ type: string | number; message: string; }>> & Partial<...>) | undefined; }'.
+src/components/quiz/mobile-quiz-taker.tsx(64,19): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/quiz/quiz-taker.tsx(61,19): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/hooks/use-mobile-anti-cheat.ts(50,26): error TS2345: Argument of type 'boolean | 0 | undefined' is not assignable to parameter of type 'SetStateAction<boolean | null>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<boolean | null>'.
+src/lib/cleanup-utils.ts(71,13): error TS2345: Argument of type '{ completed_at: string; score: number; is_flagged: boolean; violations: number; }' is not assignable to parameter of type 'never'.
+src/lib/cleanup-utils.ts(187,36): error TS2345: Argument of type '{ cutoff_date: string; }' is not assignable to parameter of type 'undefined'.

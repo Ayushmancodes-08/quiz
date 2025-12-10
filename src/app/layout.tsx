@@ -3,7 +3,7 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { SupabaseAuthProvider } from '@/hooks/use-supabase-auth';
-import Header from '@/components/shared/header';
+import { ConditionalLayout } from '@/components/shared/conditional-layout';
 import { SupabaseProvider } from '@/supabase/provider';
 
 export const metadata: Metadata = {
@@ -86,23 +86,5 @@ export default function RootLayout({
         </SupabaseProvider>
       </body>
     </html>
-  );
-}
-
-// Conditional layout component to hide header on quiz pages
-function ConditionalLayout({ children }: { children: React.ReactNode }) {
-  'use client';
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
-  const isQuizPage = pathname.startsWith('/quiz/');
-
-  if (isQuizPage) {
-    return <main className="flex-1">{children}</main>;
-  }
-
-  return (
-    <div className="relative flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">{children}</main>
-    </div>
   );
 }

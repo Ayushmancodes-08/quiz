@@ -8,8 +8,8 @@
  * - SummarizeQuizResultsOutput - The return type for the summarizeQuizResults function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const SummarizeQuizResultsInputSchema = z.object({
   quizName: z.string().describe('The name of the quiz or context for the results.'),
@@ -28,8 +28,8 @@ export async function summarizeQuizResults(input: SummarizeQuizResultsInput): Pr
 
 const prompt = ai.definePrompt({
   name: 'summarizeQuizResultsPrompt',
-  input: {schema: SummarizeQuizResultsInputSchema},
-  output: {schema: SummarizeQuizResultsOutputSchema},
+  input: { schema: SummarizeQuizResultsInputSchema },
+  output: { schema: SummarizeQuizResultsOutputSchema },
   prompt: `You are an AI assistant that helps analyze quiz results for a user.
 
 You are given a set of results from various participants across one or more quizzes. The results are in JSON format.
@@ -39,7 +39,7 @@ Your job is to summarize the results, identify overall performance trends (like 
 Context: {{{quizName}}}
 Quiz Results Data: {{{results}}}
 
-Provide a concise, analytical summary:`,
+Please provide a concise, analytical summary. Specifically, analyze academic integrity by looking at violation counts and types (if provided, e.g. "Tab Switch", "Security Violation"). Identify if specific students are repeatedly flagged.`,
 });
 
 const summarizeQuizResultsFlow = ai.defineFlow(
@@ -49,7 +49,7 @@ const summarizeQuizResultsFlow = ai.defineFlow(
     outputSchema: SummarizeQuizResultsOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    const { output } = await prompt(input);
     return output!;
   }
 );

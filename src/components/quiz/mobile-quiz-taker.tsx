@@ -35,7 +35,8 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
   const [score, setScore] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [currentViolations, setCurrentViolations] = useState(0);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [securityViolationCount, setSecurityViolationCount] = useState(0);
   const [studentName, setStudentName] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +46,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useUser();
-  const supabase = useSupabaseClient();
+  const supabase: any = useSupabaseClient();
 
   const calculateAndSaveAttemptRef = useRef<((isViolation?: boolean, violationRecords?: any[]) => Promise<void>) | null>(null);
   const attemptIdRef = useRef<string | null>(null);
@@ -53,16 +54,16 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
   const runAiCheatDetection = useCallback(async (attempt: QuizAttempt) => {
     if (!user) return;
     const result = await detectAndFlagCheatingAction({
-       quizAttemptDetails: `Score: ${attempt.score}%, Violations: ${attempt.violations}`,
-       userDetails: `User ID: ${user.id}, Name: ${user.user_metadata?.display_name || attempt.studentName}`,
-       quizDetails: `Quiz: ${quiz.title}, Topic: ${quiz.topic}, Difficulty: ${quiz.difficulty}`,
+      quizAttemptDetails: `Score: ${attempt.score}%, Violations: ${attempt.violations}`,
+      userDetails: `User ID: ${user.id}, Name: ${user.user_metadata?.display_name || attempt.studentName}`,
+      quizDetails: `Quiz: ${quiz.title}, Topic: ${quiz.topic}, Difficulty: ${quiz.difficulty}`,
     });
 
     if (result.success && result.data?.isCheating) {
-        await supabase
-          .from('quiz_attempts')
-          .update({ is_flagged: true } as any)
-          .eq('id', attempt.id);
+      await supabase
+        .from('quiz_attempts' as any)
+        .update({ is_flagged: true } as any)
+        .eq('id', attempt.id);
     }
   }, [user, quiz, supabase]);
 
@@ -70,7 +71,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     (reason: string, violationRecords?: any[]) => {
       setShowViolationWarning(true);
       setTimeout(() => setShowViolationWarning(false), 3000);
-      
+
       if (violationRecords && violationRecords.length >= 3) {
         setQuizState(QuizState.Submitting);
         if (calculateAndSaveAttemptRef.current) {
@@ -102,13 +103,28 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
     enabled: !isMobile && quizState === QuizState.InProgress,
     onViolation: handleViolation,
     maxViolations: 3,
-    maxFlags: 3,
   });
 
   // Use appropriate anti-cheat based on device
-  const { violationCount, flagCount } = isMobile 
-    ? { violationCount: mobileAntiCheat.violationCount, flagCount: mobileAntiCheat.flagCount }
-    : { violationCount: desktopAntiCheat.violationCount, flagCount: desktopAntiCheat.flagCount };
+  // Use appropriate anti-cheat based on device
+  const { isTabViolation, isSecurityViolation, activeTabCount, activeSecurityCount } = isMobile
+    ? {
+      isTabViolation: mobileAntiCheat.tabSwitchCount >= 3,
+      isSecurityViolation: mobileAntiCheat.securityViolationCount >= 3,
+      activeTabCount: mobileAntiCheat.tabSwitchCount,
+      activeSecurityCount: mobileAntiCheat.securityViolationCount
+    }
+    : {
+      isTabViolation: desktopAntiCheat.tabSwitchCount >= 3,
+      isSecurityViolation: desktopAntiCheat.securityViolationCount >= 3,
+      activeTabCount: desktopAntiCheat.tabSwitchCount,
+      activeSecurityCount: desktopAntiCheat.securityViolationCount
+    };
+
+  useEffect(() => {
+    setTabSwitchCount(activeTabCount);
+    setSecurityViolationCount(activeSecurityCount);
+  }, [activeTabCount, activeSecurityCount]);
 
   const calculateAndSaveAttempt = useCallback(async (isViolation = false, violationRecords?: any[]) => {
     if (!startTime) {
@@ -153,7 +169,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
 
     try {
       const { error } = await supabase
-        .from('quiz_attempts')
+        .from('quiz_attempts' as any)
         .insert({
           id: attemptId,
           quiz_id: quiz.id,
@@ -172,10 +188,10 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
         } as any);
 
       if (error) throw error;
-      
+
       // Store attempt ID for review
       localStorage.setItem('lastQuizAttemptId', attemptId);
-      
+
       if (user) {
         runAiCheatDetection(attempt);
       }
@@ -193,17 +209,12 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
       });
       setQuizState((current) => current === QuizState.Submitting ? QuizState.InProgress : current);
     } finally {
-      setIsSubmitting(false);
     }
-  }, [user, supabase, startTime, quiz, answers, violationCount, studentName, registrationNumber, runAiCheatDetection, toast]);
+  }, [user, supabase, startTime, quiz, answers, studentName, registrationNumber, runAiCheatDetection, toast]);
 
   useEffect(() => {
     calculateAndSaveAttemptRef.current = calculateAndSaveAttempt;
   }, [calculateAndSaveAttempt]);
-  
-  useEffect(() => {
-    setCurrentViolations(violationCount);
-  }, [violationCount]);
 
   // FIX: Shuffle options once when quiz starts, not on every render
   useEffect(() => {
@@ -215,7 +226,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
           optionsSet.add(question.correctAnswer);
         }
         const allOptions = Array.from(optionsSet);
-        
+
         const shuffled = [...allOptions];
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -249,7 +260,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
 
   const handleSubmit = () => {
     if (isSubmitting) return;
-    
+
     const unanswered = quiz.questions.length - Object.keys(answers).length;
     if (unanswered > 0) {
       toast({
@@ -258,7 +269,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
       });
       return;
     }
-    
+
     setIsSubmitting(true);
     setQuizState(QuizState.Submitting);
     calculateAndSaveAttempt(false);
@@ -332,8 +343,8 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
             </div>
           </CardContent>
           <CardFooter>
-            <Button 
-              onClick={handleStartQuiz} 
+            <Button
+              onClick={handleStartQuiz}
               className="w-full h-12 text-base font-semibold"
               size="lg"
             >
@@ -432,7 +443,7 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
                 Warning & Violation Policy
               </h3>
               <p className="text-sm md:text-base">
-                <strong>Warnings:</strong> You get <strong>3 warnings</strong> for tab switches. After 3 warnings, it becomes 1 violation.<br/>
+                <strong>Warnings:</strong> You get <strong>3 warnings</strong> for tab switches. After 3 warnings, it becomes 1 violation.<br />
                 <strong>Violations:</strong> You are allowed <strong>2 violations</strong>. On the <strong>3rd violation</strong>, your quiz will be automatically submitted and flagged for review.
               </p>
             </div>
@@ -444,15 +455,15 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
             </div>
           </CardContent>
           <CardFooter className="flex gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setQuizState(QuizState.CollectingInfo)}
               className="flex-1 h-12"
             >
               Go Back
             </Button>
-            <Button 
-              onClick={handleBeginQuiz} 
+            <Button
+              onClick={handleBeginQuiz}
               className="flex-1 h-12 text-base font-semibold"
               size="lg"
             >
@@ -470,154 +481,142 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
       <>
         {/* Mobile Banner */}
         {isMobile && <MobileQuizBanner />}
-        
+
         <div>
-      <div className="min-h-screen bg-background p-2 md:p-4">
-        {/* Warning/Violation Banner */}
-        {showViolationWarning && (
-          <div className={cn(
-            "fixed top-0 left-0 right-0 z-50 p-4 text-center font-semibold animate-in slide-in-from-top",
-            flagCount > 0 && flagCount < 3 && "bg-yellow-500 text-yellow-950",
-            flagCount >= 3 && "bg-orange-500 text-orange-950",
-            violationCount > 0 && "bg-destructive text-destructive-foreground"
-          )}>
-            {flagCount > 0 && flagCount < 3 && (
-              <>⚠️ Warning {flagCount}/3: Tab Switch Detected. {3 - flagCount} warnings remaining before violation.</>
-            )}
-            {flagCount >= 3 && violationCount === 0 && (
-              <>🚫 Violation: Excessive Tab Switching! Violations: {violationCount + 1}/3</>
-            )}
-            {violationCount > 0 && (
-              <>🚫 Violation Detected! ({violationCount}/3)</>
-            )}
-          </div>
-        )}
-
-        {/* Top Bar */}
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3 md:p-4 mb-4">
-          <div className="max-w-4xl mx-auto space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold text-lg md:text-xl truncate">{quiz.title}</h2>
-                <p className="text-sm text-muted-foreground">
-                  Question {currentQuestionIndex + 1} of {quiz.questions.length}
-                </p>
+          <div className="min-h-screen bg-background p-2 md:p-4">
+            {/* Warning/Violation Banner */}
+            {(tabSwitchCount > 0 || securityViolationCount > 0) && (
+              <div className={cn(
+                "fixed top-0 left-0 right-0 z-50 p-4 text-center font-semibold animate-in slide-in-from-top",
+                (tabSwitchCount >= 3 || securityViolationCount >= 3) ? "bg-destructive text-destructive-foreground" : "bg-orange-500 text-orange-950"
+              )}>
+                {tabSwitchCount > 0 && <div className="text-sm">Tab Violations: {tabSwitchCount}/3</div>}
+                {securityViolationCount > 0 && <div className="text-sm">Security Violations: {securityViolationCount}/3</div>}
+                {(tabSwitchCount >= 3 || securityViolationCount >= 3) && <div className="font-bold mt-1">Quiz will be auto-submitted.</div>}
               </div>
-              <div className="flex items-center gap-3">
-                {/* Warnings/Flags Counter */}
-                <div className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
-                  flagCount === 0 && "bg-green-500/10 text-green-500",
-                  flagCount === 1 && "bg-yellow-500/10 text-yellow-500",
-                  flagCount === 2 && "bg-orange-500/10 text-orange-500",
-                  flagCount >= 3 && "bg-red-500/10 text-red-500"
-                )}>
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="hidden sm:inline">Warnings:</span>
-                  <span className="font-bold">{flagCount}/3</span>
-                </div>
+            )}
 
-                {/* Violations Counter */}
-                <div className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
-                  violationCount === 0 && "bg-green-500/10 text-green-500",
-                  violationCount === 1 && "bg-yellow-500/10 text-yellow-500",
-                  violationCount === 2 && "bg-orange-500/10 text-orange-500",
-                  violationCount >= 3 && "bg-destructive/10 text-destructive"
-                )}>
-                  <Shield className="w-4 h-4" />
-                  <span className="hidden sm:inline">Violations:</span>
-                  <span className="font-bold">{violationCount}/3</span>
+            {/* Top Bar */}
+            <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3 md:p-4 mb-4">
+              <div className="max-w-4xl mx-auto space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold text-lg md:text-xl truncate">{quiz.title}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Question {currentQuestionIndex + 1} of {quiz.questions.length}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
+                      tabSwitchCount === 0 && "bg-green-500/10 text-green-500",
+                      tabSwitchCount > 0 && tabSwitchCount < 3 && "bg-orange-500/10 text-orange-500",
+                      tabSwitchCount >= 3 && "bg-destructive/10 text-destructive"
+                    )}>
+                      <AlertCircle className="w-4 h-4" />
+                      <span className="hidden sm:inline">Tab:</span>
+                      <span className="font-bold">{tabSwitchCount}/3</span>
+                    </div>
+
+                    <div className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
+                      securityViolationCount === 0 && "bg-green-500/10 text-green-500",
+                      securityViolationCount > 0 && securityViolationCount < 3 && "bg-orange-500/10 text-orange-500",
+                      securityViolationCount >= 3 && "bg-destructive/10 text-destructive"
+                    )}>
+                      <Shield className="w-4 h-4" />
+                      <span className="hidden sm:inline">Security:</span>
+                      <span className="font-bold">{securityViolationCount}/3</span>
+                    </div>
+                  </div>
                 </div>
+                <Progress value={progress} className="h-2" />
               </div>
             </div>
-            <Progress value={progress} className="h-2" />
-          </div>
-        </div>
 
-        {/* Question Card */}
-        <div className="max-w-4xl mx-auto pb-24">
-          <Card className="shadow-lg">
-            <CardHeader className="space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <CardTitle className="text-xl md:text-2xl leading-relaxed">
-                  {currentQuestion.question}
-                </CardTitle>
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                  {currentQuestionIndex + 1}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup
-                value={answers[currentQuestionIndex] || ''}
-                onValueChange={handleSelectAnswer}
-                className="space-y-3"
-              >
-                {currentOptions.map((option, index) => (
-                  <div
-                    key={index}
-                    className={cn(
-                      "flex items-center space-x-3 p-4 rounded-lg border-2 transition-all cursor-pointer hover:bg-accent",
-                      answers[currentQuestionIndex] === option
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    )}
-                    onClick={() => handleSelectAnswer(option)}
-                  >
-                    <RadioGroupItem value={option} id={`option-${index}`} className="flex-shrink-0" />
-                    <Label
-                      htmlFor={`option-${index}`}
-                      className="flex-1 cursor-pointer text-base md:text-lg leading-relaxed"
-                    >
-                      {option}
-                    </Label>
+            {/* Question Card */}
+            <div className="max-w-4xl mx-auto pb-24">
+              <Card className="shadow-lg">
+                <CardHeader className="space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <CardTitle className="text-xl md:text-2xl leading-relaxed">
+                      {currentQuestion.question}
+                    </CardTitle>
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+                      {currentQuestionIndex + 1}
+                    </div>
                   </div>
-                ))}
-              </RadioGroup>
-            </CardContent>
-          </Card>
-        </div>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    value={answers[currentQuestionIndex] || ''}
+                    onValueChange={handleSelectAnswer}
+                    className="space-y-3"
+                  >
+                    {currentOptions.map((option, index) => (
+                      <div
+                        key={index}
+                        className={cn(
+                          "flex items-center space-x-3 p-4 rounded-lg border-2 transition-all cursor-pointer hover:bg-accent",
+                          answers[currentQuestionIndex] === option
+                            ? "border-primary bg-primary/5"
+                            : "border-border"
+                        )}
+                        onClick={() => handleSelectAnswer(option)}
+                      >
+                        <RadioGroupItem value={option} id={`option-${index}`} className="flex-shrink-0" />
+                        <Label
+                          htmlFor={`option-${index}`}
+                          className="flex-1 cursor-pointer text-base md:text-lg leading-relaxed"
+                        >
+                          {option}
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+            </div>
 
-        {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t p-3 md:p-4">
-          <div className="max-w-4xl mx-auto flex gap-3">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentQuestionIndex === 0}
-              className="flex-1 h-12 text-base"
-            >
-              Previous
-            </Button>
-            {currentQuestionIndex < quiz.questions.length - 1 ? (
-              <Button
-                onClick={handleNext}
-                disabled={!answers[currentQuestionIndex]}
-                className="flex-1 h-12 text-base font-semibold"
-              >
-                Next Question
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={!answers[currentQuestionIndex] || isSubmitting}
-                className="flex-1 h-12 text-base font-semibold"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Submitting...
-                  </>
+            {/* Bottom Navigation */}
+            <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t p-3 md:p-4">
+              <div className="max-w-4xl mx-auto flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handlePrevious}
+                  disabled={currentQuestionIndex === 0}
+                  className="flex-1 h-12 text-base"
+                >
+                  Previous
+                </Button>
+                {currentQuestionIndex < quiz.questions.length - 1 ? (
+                  <Button
+                    onClick={handleNext}
+                    disabled={!answers[currentQuestionIndex]}
+                    className="flex-1 h-12 text-base font-semibold"
+                  >
+                    Next Question
+                  </Button>
                 ) : (
-                  'Submit Quiz'
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!answers[currentQuestionIndex] || isSubmitting}
+                    className="flex-1 h-12 text-base font-semibold"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit Quiz'
+                    )}
+                  </Button>
                 )}
-              </Button>
-            )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      </div>
       </>
     );
   }
@@ -657,8 +656,8 @@ export function MobileQuizTaker({ quiz }: { quiz: WithId<Quiz> }) {
               <div className="text-6xl md:text-7xl font-bold text-primary">{score}%</div>
               <p className="text-lg text-muted-foreground">Your Score</p>
             </div>
-            <Button 
-              onClick={() => router.push('/')} 
+            <Button
+              onClick={() => router.push('/')}
               size="lg"
               className="w-full h-12 text-base font-semibold"
             >

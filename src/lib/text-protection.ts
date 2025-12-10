@@ -257,7 +257,7 @@ export function textToImageDataURL(
 export function detectAIReading(): boolean {
   // Detect if mobile device
   const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
+
   // Check for common AI scraping indicators
   const indicators = [
     // Check for headless browser (ONLY on desktop - mobile browsers often have 0 plugins)
@@ -280,9 +280,9 @@ export function protectText(text: string, method: 'aggressive' | 'moderate' | 'l
   switch (method) {
     case 'aggressive':
       // Use all techniques
-      let protected = addInvisibleCharacters(text);
-      protected = encodeWithHomoglyphs(protected);
-      return protected;
+      let protectedContent = addInvisibleCharacters(text);
+      protectedContent = encodeWithHomoglyphs(protectedContent);
+      return protectedContent;
 
     case 'moderate':
       // Use invisible characters only

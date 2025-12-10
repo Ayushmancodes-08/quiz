@@ -1,0 +1,35 @@
+﻿
+> nextn@0.1.0 typecheck
+> tsc --noEmit
+
+src/app/admin/security-logs/page.tsx(120,51): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+src/app/api/admin/api-keys/status/route.ts(26,18): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/admin/cleanup/abandoned-attempts/route.ts(26,18): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/admin/cleanup/abandoned-attempts/route.ts(43,51): error TS2345: Argument of type '{ p_performed_by: string; p_operation_type: string; p_records_affected: number; p_config: { gracePeriodHours: any; }; p_result: { details: AbandonedAttempt[]; }; }' is not assignable to parameter of type 'undefined'.
+src/app/api/admin/cleanup/orphaned/route.ts(26,18): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/admin/cleanup/orphaned/route.ts(53,49): error TS2345: Argument of type '{ p_performed_by: string; p_operation_type: string; p_records_affected: number; p_config: {}; p_result: { shuffledQuestionsDeleted: number; studentAnswersDeleted: number; }; }' is not assignable to parameter of type 'undefined'.
+src/app/api/admin/cleanup/violations/route.ts(26,18): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/admin/cleanup/violations/route.ts(51,51): error TS2345: Argument of type '{ p_performed_by: string; p_operation_type: string; p_records_affected: number; p_config: { retentionDays: any; archiveBeforeDelete: boolean; }; p_result: { violationsArchived: number; violationsDeleted: number; }; }' is not assignable to parameter of type 'undefined'.
+src/app/settings/page.tsx(49,17): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/auth/auth-form.tsx(109,26): error TS2339: Property 'displayName' does not exist on type 'FieldErrors<{ password: string; email: string; } | { password: string; displayName: string; email: string; }>'.
+  Property 'displayName' does not exist on type 'Partial<FieldErrorsImpl<{ password: string; email: string; }>> & { root?: (Record<string, Partial<{ type: string | number; message: string; }>> & Partial<...>) | undefined; }'.
+src/components/quiz/mobile-quiz-taker.tsx(64,19): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/quiz/quiz-taker.tsx(61,19): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/hooks/use-mobile-anti-cheat.ts(50,26): error TS2345: Argument of type 'boolean | 0 | undefined' is not assignable to parameter of type 'SetStateAction<boolean | null>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<boolean | null>'.
+src/lib/cleanup-utils.ts(52,24): error TS2339: Property 'id' does not exist on type 'never'.
+src/lib/cleanup-utils.ts(53,21): error TS2339: Property 'userId' does not exist on type 'never'.
+src/lib/cleanup-utils.ts(54,21): error TS2339: Property 'quizId' does not exist on type 'never'.
+src/lib/cleanup-utils.ts(55,33): error TS2339: Property 'startedAt' does not exist on type 'never'.
+src/lib/cleanup-utils.ts(71,13): error TS2345: Argument of type '{ completedAt: string; score: number; isFlagged: boolean; violations: number; }' is not assignable to parameter of type 'never'.
+src/lib/cleanup-utils.ts(187,36): error TS2345: Argument of type '{ cutoff_date: string; }' is not assignable to parameter of type 'undefined'.
+src/lib/security-utils.ts(130,17): error TS2551: Property 'msUserSelect' does not exist on type 'CSSStyleDeclaration'. Did you mean 'userSelect'?
+src/lib/text-protection.ts(283,11): error TS1214: Identifier expected. 'protected' is a reserved word in strict mode. Modules are automatically in strict mode.
+src/lib/text-protection.ts(284,7): error TS1214: Identifier expected. 'protected' is a reserved word in strict mode. Modules are automatically in strict mode.
+src/lib/text-protection.ts(284,40): error TS1214: Identifier expected. 'protected' is a reserved word in strict mode. Modules are automatically in strict mode.
+src/lib/text-protection.ts(285,14): error TS1214: Identifier expected. 'protected' is a reserved word in strict mode. Modules are automatically in strict mode.
+src/supabase/hooks/use-query.tsx(17,21): error TS2707: Generic type 'PostgrestFilterBuilder<ClientOptions, Schema, Row, Result, RelationName, Relationships, Method>' requires between 4 and 7 type arguments.
+src/supabase/hooks/use-query.tsx(39,22): error TS7031: Binding element 'queryData' implicitly has an 'any' type.
+src/supabase/hooks/use-query.tsx(39,40): error TS7031: Binding element 'queryError' implicitly has an 'any' type.
+src/supabase/hooks/use-query.tsx(54,15): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/supabase/index.ts(7,1): error TS2308: Module './hooks/use-query' has already exported a member named 'WithId'. Consider explicitly re-exporting to resolve the ambiguity.

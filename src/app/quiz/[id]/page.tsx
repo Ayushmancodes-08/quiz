@@ -1,7 +1,7 @@
 'use client';
 
 import { useSupabaseClient, WithId } from '@/supabase';
-import { MobileQuizTaker } from '@/components/quiz/mobile-quiz-taker';
+import { QuizTaker } from '@/components/quiz/quiz-taker';
 import { useParams } from 'next/navigation';
 import type { Quiz } from '@/lib/types';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -71,7 +71,7 @@ export default function QuizPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Quiz Not Found</AlertTitle>
           <AlertDescription>
-            {error 
+            {error
               ? 'Unable to load the quiz. Please check the link and try again.'
               : 'The quiz you are looking for does not exist or has been deleted.'}
           </AlertDescription>
@@ -82,6 +82,6 @@ export default function QuizPage() {
 
   // The quiz object from useDoc is already combined with its ID.
   return (
-    <MobileQuizTaker quiz={quiz as WithId<Quiz>} />
+    <QuizTaker quiz={quiz as WithId<Quiz>} />
   );
 }
