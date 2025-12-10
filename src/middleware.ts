@@ -27,10 +27,22 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  // Refresh session if expired - required for Server Components
+  // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-session-with-middleware
+  try {
+    // Timeout the auth check after 2 seconds to prevent Vercel 504 errors on slow connections
+    // The home page / doesn't strictly need auth, so it's better to load than to timeout
+    const authPromise = supabase.auth.getUser();
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ data: { user: null }, error: 'timeout' }), 2000));
+
+    await Promise.race([authPromise, timeoutPromise]);
+  } catch (e) {
+    // If auth fails, we still want to return the response so the user can see the page
+    console.error('Middleware auth check failed:', e);
+  }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
-  
+
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https://fonts.googleapis.com;
