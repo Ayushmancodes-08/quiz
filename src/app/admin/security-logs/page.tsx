@@ -5,6 +5,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 export default async function SecurityLogsPage() {
   let logs: any[] = [];
   let error: any = null;
